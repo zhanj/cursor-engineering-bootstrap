@@ -16,7 +16,7 @@ if [[ ! -f "${DIR}/config.sh" ]]; then
 fi
 source "${DIR}/config.sh"
 
-MODE="${CURSOR_CONTRACT_GATE_MODE:-block}"
+MODE="${CURSOR_CONTRACT_GATE_MODE:-warn}"
 
 if ! command -v git >/dev/null 2>&1; then
   echo "[contract-gate] git not found; skip."
@@ -63,9 +63,10 @@ if [[ $api_code_changed -eq 1 && $openapi_changed -eq 0 ]]; then
   msg=$'[contract-gate] 命中 API 目录白名单的代码发生变更，但未更新 OpenAPI 契约(openapi.yaml)。
 '$'  处理方式：
 '$'  1) 若影响接口（路径/参数/返回/鉴权/错误码），请同步更新 contracts/openapi.yaml（或 Spec Center 契约）
-'$'  2) 若不影响接口，请在 PR 描述中明确“接口不变”的依据，并建议补充测试/截图
+'$'  2) 若为新增/调整接口，请同步更新 spec_center/capability-registry.md 能力条目
+'$'  3) 若不影响接口，请在 PR 描述中明确“接口不变”的依据，并建议补充测试/截图
 '$'  配置位置：.cursor/hooks/gates/config.sh（只改一处，全队生效）
-'$'  可通过 CURSOR_CONTRACT_GATE_MODE=warn 临时降级为告警（不建议长期使用）'
+'$'  如需强制阻断，可设置 CURSOR_CONTRACT_GATE_MODE=block'
   if [[ "${MODE}" == "warn" ]]; then
     echo "${msg}"
     exit 0

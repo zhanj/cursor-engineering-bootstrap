@@ -18,6 +18,7 @@
 - `/api-search` 未先检索 `capability-registry.md` 就直接看代码或新增接口。
 - 顺手重构无关代码，导致 diff 膨胀。
 - 修改接口行为但未更新契约或未解释“接口不变”依据。
+- 新增接口但未同步 `spec_center/capability-registry.md` 与 `contracts/openapi.yaml`。
 - 只给“已验证”结论，不提供可复现命令。
 
 ## 检查清单
@@ -26,4 +27,5 @@
 - [ ] `capability-registry.md` 检索按 `OwnerType` 优先级执行：`internal-self` -> `internal-other` -> `external-vendor`。
 - [ ] 仅修改任务必需文件，未扩大变更边界。
 - [ ] 若接口变更，已更新契约或给出不变依据。
+- [ ] 若新增/调整接口，已同步 `spec_center/capability-registry.md`；若未接入 Spec Center，在 PR 标注“待建”与补建计划。
 - [ ] 提供至少一条可复制验证命令。

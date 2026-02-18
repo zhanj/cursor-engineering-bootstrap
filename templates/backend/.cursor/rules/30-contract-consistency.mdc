@@ -16,8 +16,10 @@
 - 修改参数/返回结构但不更新 `openapi.yaml`。
 - 只在 PR 中口头声明“兼容”而无证据。
 - 忽略错误码与鉴权语义变化。
+- 新增接口但未在 `spec_center/capability-registry.md` 记录能力条目。
 
 ## 检查清单
 - [ ] API 改动已映射到契约文件。
+- [ ] 新增/调整接口已同步到 `spec_center/capability-registry.md`（若仓库未接入 Spec Center，需在 PR 标注“待建”）。
 - [ ] endpoint、参数、返回、错误码、鉴权均已核对。
 - [ ] PR 描述包含契约影响结论。

@@ -1,8 +1,9 @@
 # Gates（阻断/告警门禁）
 
-- `contract-check.sh`：契约一致性门禁（默认阻断）
-  - API 相关代码变更但未更新 openapi.yaml → 阻断
-  - 降级：CURSOR_CONTRACT_GATE_MODE=warn
+- `contract-check.sh`：契约一致性门禁（默认告警）
+  - API 相关代码变更但未更新 openapi.yaml → 告警/可阻断
+  - 新增/调整接口时，需同步 `spec_center/capability-registry.md`
+  - 升级：CURSOR_CONTRACT_GATE_MODE=block
 
 - `db-change-check.sh`：DB 一致性门禁（默认告警）
   - 迁移变更但未同步持久层 → 告警/可阻断

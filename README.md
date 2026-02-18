@@ -267,6 +267,16 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 - 自动执行 gate：在 PR/push 时由 GitHub Actions 运行同一脚本
 - 若脚本退出码非 0，workflow 失败；启用分支保护后可阻止合并
 
+### 契约门禁策略与新接口约定（建议默认）
+
+- 契约门禁策略：`CURSOR_CONTRACT_GATE_MODE=warn`（默认告警，便于存量项目渐进接入）。
+- 收敛后可加严：将 `CURSOR_CONTRACT_GATE_MODE` 调整为 `block`，在契约未同步时直接阻断合并。
+- DB 门禁策略：`CURSOR_DB_GATE_MODE=warn`（默认告警，可按团队阶段改为 `block`）。
+- 新增或调整接口时，必须同步两处：
+  - `spec_center/capability-registry.md`（登记能力条目与同义词）
+  - `spec_center/<service>/contracts/openapi.yaml`（更新 endpoint/参数/返回/鉴权/错误码）
+- 若仓库暂未接入 Spec Center，PR 必须标注 `Spec 资产待建`，并给出补建计划与时点。
+
 ### Smoke tests（已内置）
 
 仓库内置了 3 类 smoke tests + 1 个总入口：

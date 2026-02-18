@@ -12,8 +12,8 @@ set -euo pipefail
 # ------------------------
 # Contract Gate
 # ------------------------
-# block: 默认阻断；warn: 仅告警
-export CURSOR_CONTRACT_GATE_MODE="${CURSOR_CONTRACT_GATE_MODE:-block}"
+# warn: 默认告警（便于增量落地）；block: 阻断
+export CURSOR_CONTRACT_GATE_MODE="${CURSOR_CONTRACT_GATE_MODE:-warn}"
 
 # 目录白名单（仅当变更命中这些目录/文件时才触发契约门禁）
 # 使用正则（grep -E），多个用 | 连接

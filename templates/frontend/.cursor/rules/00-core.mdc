@@ -17,6 +17,7 @@
 - 不查复用就新增 API 调用层。
 - `/api-search` 未先检索 `capability-registry.md` 就直接进入代码实现。
 - 无关样式或组件顺手重构导致 diff 失控。
+- 新增接口调用但未同步 `spec_center/capability-registry.md` 与 `contracts/openapi.yaml`。
 - 不提供可复现的验证步骤。
 
 ## 检查清单
@@ -24,4 +25,5 @@
 - [ ] `/api-search` 按顺序完成检索：`capability-registry.md` -> `contracts/openapi.yaml` -> 代码实现 -> `_raw_contracts/**`（仅兜底）。
 - [ ] `capability-registry.md` 检索按 `OwnerType` 优先级执行：`internal-self` -> `internal-other` -> `external-vendor`。
 - [ ] 改动落在约定目录，未引入散点文件。
+- [ ] 若新增/调整接口，已同步 `spec_center/capability-registry.md`；若未接入 Spec Center，在 PR 标注“待建”与补建计划。
 - [ ] lint/tsc 及关键流程验证通过。
