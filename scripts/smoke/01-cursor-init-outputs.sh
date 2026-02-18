@@ -55,6 +55,7 @@ run_mode() {
   assert_file "${workdir}/_cursor_init/proposed_tree.md"
   assert_file "${workdir}/_cursor_init/apply_plan.md"
   assert_file "${workdir}/_cursor_init/hooks.suggested.json"
+  assert_file "${workdir}/_cursor_init/cursor-bootstrap-readme.md"
 
   assert_contains "${workdir}/_cursor_init/report.md" "项目识别"
 
@@ -67,6 +68,7 @@ run_mode() {
   )
 
   assert_dir "${workdir}/_cursor_init/patch_bundle/${mode}"
+  assert_file "${workdir}/_cursor_init/patch_bundle/${mode}/docs/cursor-bootstrap-readme.md"
 }
 
 run_mode backend

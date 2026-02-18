@@ -20,6 +20,7 @@ usage() {
   echo "  --spec-kit-dry-run            Print spec-kit init command without executing it"
   echo "  --spec-kit-yes                Required confirmation for real spec-kit execution"
   echo "  --spec-kit-force              Add '--force' to spec-kit init (high-risk, explicit only)"
+  echo "  --no-bootstrap-readme         Do not include bootstrap README in generated outputs"
 }
 
 CMD="${1:-}"
@@ -32,6 +33,7 @@ SPEC_KIT_YES=0
 SPEC_KIT_FORCE=0
 TARGET_DIR=""
 USE_CURRENT_DIR=0
+INCLUDE_BOOTSTRAP_README=1
 shift || true
 
 while [[ $# -gt 0 ]]; do
@@ -85,6 +87,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --spec-kit-force)
       SPEC_KIT_FORCE=1
+      shift
+      ;;
+    --no-bootstrap-readme)
+      INCLUDE_BOOTSTRAP_README=0
       shift
       ;;
     *) shift ;;
@@ -168,6 +174,7 @@ REPORT="${OUT_DIR}/report.md"
 TREE="${OUT_DIR}/proposed_tree.md"
 PLAN="${OUT_DIR}/apply_plan.md"
 HOOKS_SUGGESTED="${OUT_DIR}/hooks.suggested.json"
+BOOTSTRAP_README_OUT="${OUT_DIR}/cursor-bootstrap-readme.md"
 
 SEARCH_EXCLUDES=(
   ".git"
@@ -463,11 +470,39 @@ bundle_templates() {
     exit 1
   fi
   cp -R "${src}/." "${dst}/"
+  if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
+    mkdir -p "${dst}/docs"
+    cp "${BOOTSTRAP_README_OUT}" "${dst}/docs/cursor-bootstrap-readme.md"
+  fi
   echo "Patch bundle written to ${dst}"
+}
+
+write_bootstrap_readme() {
+  if [[ "${INCLUDE_BOOTSTRAP_README}" != "1" ]]; then
+    return 0
+  fi
+
+  local src_readme="${ROOT_DIR}/README.md"
+  if [[ ! -f "${src_readme}" ]]; then
+    echo "Warning: bootstrap README not found at ${src_readme}; skip copy."
+    return 0
+  fi
+
+  cat > "${BOOTSTRAP_README_OUT}" <<EOF
+# Cursor Bootstrap README Snapshot
+
+> Source: ${src_readme}
+> Purpose: this snapshot is for Cursor retrieval and onboarding, not a replacement for your business README.
+
+---
+
+EOF
+  cat "${src_readme}" >> "${BOOTSTRAP_README_OUT}"
 }
 
 main() {
   write_skeletons
+  write_bootstrap_readme
   check_spec_kit_env
   run_spec_kit_init
   if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
@@ -515,6 +550,11 @@ EOF
   echo "- spec_kit_init: ${SPEC_KIT_INIT_RESULT}" >> "${REPORT}"
   echo "- spec_kit_init_cmd: ${SPEC_KIT_INIT_CMD}" >> "${REPORT}"
   echo "- spec_kit_hint: ${SPEC_KIT_HINT}" >> "${REPORT}"
+  if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
+    echo "- bootstrap_readme: ${BOOTSTRAP_README_OUT}" >> "${REPORT}"
+  else
+    echo "- bootstrap_readme: disabled (--no-bootstrap-readme)" >> "${REPORT}"
+  fi
 
   if [[ "${CMD}" == "bundle" ]]; then
     bundle_templates
@@ -525,6 +565,9 @@ EOF
   echo " - ${TREE}"
   echo " - ${PLAN}"
   echo " - ${HOOKS_SUGGESTED}"
+  if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
+    echo " - ${BOOTSTRAP_README_OUT}"
+  fi
   if [[ "${CMD}" == "bundle" ]]; then
     echo " - ${OUT_DIR}/patch_bundle/"
   fi

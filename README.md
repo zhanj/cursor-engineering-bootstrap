@@ -134,6 +134,7 @@ bash bin/cursor-init bundle  --mode backend|frontend|spec_center --use-current-d
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-yes
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-dry-run
+bash bin/cursor-init bundle --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bootstrap-readme
 ```
 
 spec-kit 集成参数：
@@ -146,6 +147,7 @@ spec-kit 集成参数：
 - `--spec-kit-dry-run`：仅打印将执行的 `specify init` 命令（不执行，需与 `--execute-spec-kit` 同时使用）
 - `--spec-kit-yes`：执行前显式确认（真实执行时必填）
 - `--spec-kit-force`：在执行时追加 `--force`（高风险，需与 `--execute-spec-kit` 同时使用）
+- `--no-bootstrap-readme`：不生成 bootstrap README 快照（默认会生成）
 
 说明：
 
@@ -160,6 +162,7 @@ spec-kit 集成参数：
 - `proposed_tree.md`：建议新增的文件树
 - `apply_plan.md`：落库步骤与人工确认项
 - `hooks.suggested.json`：自动推断的 hooks 命令建议
+- `cursor-bootstrap-readme.md`：bootstrap 说明快照（供 Cursor 检索，默认生成；可用 `--no-bootstrap-readme` 关闭）
 
 若启用 `--with-spec-kit`，`report.md` 还会包含：
 
@@ -192,6 +195,7 @@ spec-kit 集成参数：
 ### `bundle` 会产出什么
 
 - `_cursor_init/patch_bundle/<mode>/`：对应模板快照，供 PR 落库使用
+- 默认额外包含：`_cursor_init/patch_bundle/<mode>/docs/cursor-bootstrap-readme.md`（用于目标仓 Cursor 检索）
 
 其中：
 
