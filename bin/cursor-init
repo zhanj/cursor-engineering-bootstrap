@@ -335,8 +335,8 @@ run_spec_kit_init() {
     return 0
   fi
 
-  # Safe by default: if spec-kit assets already exist, avoid overwriting.
-  # If .specify is missing, bootstrap in temp dir and merge missing files only.
+  # Safe by default: never overwrite existing files unless --overwrite is set.
+  # Always bootstrap in a temp dir and merge missing files only.
   local existing_assets=()
   local maybe_asset
   for maybe_asset in ".cursor" ".vscode" "PR_TEMPLATE.md" "doc/DEV.md" "spec_center"; do
@@ -346,50 +346,54 @@ run_spec_kit_init() {
   done
   if [[ ${#existing_assets[@]} -gt 0 ]]; then
     SPEC_KIT_EXISTING_ASSETS="$(IFS=,; echo "${existing_assets[*]}")"
-    if [[ "${OVERWRITE}" != "1" ]]; then
-      if [[ -d ".specify" ]]; then
-        SPEC_KIT_INIT_RESULT="skipped_existing_assets"
-        SPEC_KIT_HINT="Existing spec-kit assets detected (${SPEC_KIT_EXISTING_ASSETS}). .specify already exists, so init is skipped to avoid overwriting."
-        echo "spec-kit init skipped to avoid overwriting existing files."
-        echo "Detected assets: ${SPEC_KIT_EXISTING_ASSETS}"
-        echo "[spec-kit] skipped_existing_assets: ${SPEC_KIT_EXISTING_ASSETS}" >> "${SPEC_KIT_INIT_LOG}"
-        echo "[spec-kit] .specify already exists, no init executed" >> "${SPEC_KIT_INIT_LOG}"
-        return 0
-      fi
+  fi
 
-      local tmpdir
-      tmpdir="$(mktemp -d)"
-      local temp_init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--force" "--no-git")
-      SPEC_KIT_INIT_CMD="${temp_init_cmd[*]} (temp bootstrap + non-overwrite merge)"
-      echo "Existing assets detected (${SPEC_KIT_EXISTING_ASSETS}), .specify missing."
+  if [[ "${OVERWRITE}" != "1" ]]; then
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    local temp_init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--force" "--no-git")
+    SPEC_KIT_INIT_CMD="${temp_init_cmd[*]} (temp bootstrap + non-overwrite merge)"
+    if [[ "${SPEC_KIT_EXISTING_ASSETS}" == "none" ]]; then
       echo "Running non-overwrite bootstrap from temp directory."
+      echo "[spec-kit] existing_assets=none" >> "${SPEC_KIT_INIT_LOG}"
+    else
+      echo "Existing assets detected (${SPEC_KIT_EXISTING_ASSETS}), running non-overwrite bootstrap from temp directory."
       echo "[spec-kit] existing_assets=${SPEC_KIT_EXISTING_ASSETS}" >> "${SPEC_KIT_INIT_LOG}"
-      echo "[spec-kit] .specify missing, run temp bootstrap: ${temp_init_cmd[*]}" >> "${SPEC_KIT_INIT_LOG}"
-      if (cd "${tmpdir}" && "${temp_init_cmd[@]}") >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
-        cp -R -n "${tmpdir}/." "${PROJECT_DIR}/"
-        rm -rf "${tmpdir}"
-        if [[ -d ".specify" ]]; then
-          SPEC_KIT_INIT_RESULT="ok_non_overwrite_merge"
-          SPEC_KIT_HINT="spec-kit assets bootstrapped in temp dir and merged without overwriting existing files."
-          echo "[spec-kit] temp bootstrap merge success, .specify exists" >> "${SPEC_KIT_INIT_LOG}"
-          return 0
-        else
-          SPEC_KIT_INIT_RESULT="failed_missing_specify_dir"
-          SPEC_KIT_HINT="Temp bootstrap finished but .specify is still missing after non-overwrite merge. See log: ${SPEC_KIT_INIT_LOG}"
-          echo "spec-kit bootstrap completed but .specify directory was not created."
-          echo "See log for details: ${SPEC_KIT_INIT_LOG}"
-          echo "[spec-kit] ERROR: temp bootstrap finished but .specify missing" >> "${SPEC_KIT_INIT_LOG}"
-          exit 1
-        fi
+    fi
+    echo "[spec-kit] run temp bootstrap: ${temp_init_cmd[*]}" >> "${SPEC_KIT_INIT_LOG}"
+    if (cd "${tmpdir}" && "${temp_init_cmd[@]}") >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
+      if command -v rsync >/dev/null 2>&1; then
+        rsync -a --ignore-existing "${tmpdir}/" "${PROJECT_DIR}/" >>"${SPEC_KIT_INIT_LOG}" 2>&1
       else
-        rm -rf "${tmpdir}"
         SPEC_KIT_INIT_RESULT="failed"
-        SPEC_KIT_HINT="spec-kit temp bootstrap failed. See log: ${SPEC_KIT_INIT_LOG}"
-        echo "spec-kit temp bootstrap failed."
-        echo "See log for details: ${SPEC_KIT_INIT_LOG}"
-        echo "[spec-kit] ERROR: temp bootstrap failed" >> "${SPEC_KIT_INIT_LOG}"
+        SPEC_KIT_HINT="rsync is required for non-overwrite merge but was not found."
+        echo "spec-kit temp bootstrap failed: rsync not found for safe merge."
+        echo "[spec-kit] ERROR: rsync not found for non-overwrite merge" >> "${SPEC_KIT_INIT_LOG}"
+        rm -rf "${tmpdir}"
         exit 1
       fi
+      rm -rf "${tmpdir}"
+      if [[ -d ".specify" ]]; then
+        SPEC_KIT_INIT_RESULT="ok_non_overwrite_merge"
+        SPEC_KIT_HINT="spec-kit assets bootstrapped in temp dir and merged without overwriting existing files."
+        echo "[spec-kit] temp bootstrap merge success, .specify exists" >> "${SPEC_KIT_INIT_LOG}"
+        return 0
+      else
+        SPEC_KIT_INIT_RESULT="failed_missing_specify_dir"
+        SPEC_KIT_HINT="Temp bootstrap finished but .specify is still missing after non-overwrite merge. See log: ${SPEC_KIT_INIT_LOG}"
+        echo "spec-kit bootstrap completed but .specify directory was not created."
+        echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+        echo "[spec-kit] ERROR: temp bootstrap finished but .specify missing" >> "${SPEC_KIT_INIT_LOG}"
+        exit 1
+      fi
+    else
+      rm -rf "${tmpdir}"
+      SPEC_KIT_INIT_RESULT="failed"
+      SPEC_KIT_HINT="spec-kit temp bootstrap failed. See log: ${SPEC_KIT_INIT_LOG}"
+      echo "spec-kit temp bootstrap failed."
+      echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+      echo "[spec-kit] ERROR: temp bootstrap failed" >> "${SPEC_KIT_INIT_LOG}"
+      exit 1
     fi
   fi
 

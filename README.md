@@ -156,8 +156,8 @@ spec-kit 集成参数：
 - 阶段 A（低风险）：只使用 `--with-spec-kit`（检查与建议，不执行初始化）
 - 阶段 B（可选）：增加 `--execute-spec-kit` 执行初始化
 - 安全默认：若检测到 `.cursor`、`.vscode`、`PR_TEMPLATE.md`、`doc/DEV.md`、`spec_center` 已存在：
-  - 若 `.specify` 已存在：跳过初始化，避免覆盖
-  - 若 `.specify` 缺失：在临时目录执行 spec-kit 初始化，再“仅补齐缺失文件”到目标目录（不覆盖现有文件）
+  - 一律在临时目录执行 spec-kit 初始化，再“仅补齐缺失文件”到目标目录（不覆盖现有文件）
+  - 已存在文件保持不变，不会因目录存在而整体跳过
 - 执行校验：若 `specify init` 返回成功但未生成 `.specify/`，会标记为失败并提示查看 `specify-init.log`
 
 ### `dry-run` 会产出什么
@@ -181,7 +181,7 @@ spec-kit 集成参数：
 - `spec_kit_dry_run`：是否只做 spec-kit 命令预演
 - `spec_kit_yes`：是否提供执行确认开关
 - `spec_kit_force`：是否启用 force 模式
-- `spec_kit_init`：初始化执行结果（not_requested/skipped/skipped_existing_assets/dry_run/ok/ok_non_overwrite_merge/failed/failed_missing_specify_dir/blocked_missing_confirmation）
+- `spec_kit_init`：初始化执行结果（not_requested/skipped/dry_run/ok/ok_non_overwrite_merge/failed/failed_missing_specify_dir/blocked_missing_confirmation）
 - `spec_kit_init_cmd`：执行或建议的初始化命令
 - `spec_kit_log`：spec-kit 初始化日志路径（排查失败时优先查看）
 - `spec_kit_hint`：下一步建议（安装或执行提示）
