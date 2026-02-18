@@ -1,0 +1,23 @@
+# 20-db-dao（backend 持久层一致性）
+
+目标：确保 DAO/Repository/Mapper 与 schema 变化保持一致，避免运行期结构错配。
+
+## 输入
+- migration 文件（Flyway/Liquibase）
+- 目标表结构变化（字段、索引、约束）
+- 现有持久层规范（Entity/Mapper/Repository 命名）
+
+## 输出
+- schema diff 与持久层 diff 对照
+- 受影响查询路径说明
+- 最小验证结果（至少覆盖 1 条关键 SQL 路径）
+
+## 反例（禁止）
+- 不看 migration 直接改 DAO。
+- 生成大量无关 CRUD 模板代码。
+- 结构变更后不更新映射层（Entity/Mapper/XML）。
+
+## 检查清单
+- [ ] 迁移与持久层改动成对出现（或有合理豁免说明）。
+- [ ] 字段类型/空值语义在代码层已对齐。
+- [ ] 关键查询与写入路径已做最小回归验证。

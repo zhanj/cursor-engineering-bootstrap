@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "frontend:lint",
+      "when": "pre_commit",
+      "run": "pnpm -s lint"
+    },
+    {
+      "name": "frontend:tsc",
+      "when": "pre_commit",
+      "run": "pnpm -s tsc"
+    }
+  ]
+}

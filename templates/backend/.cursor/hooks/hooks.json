@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "backend:unit-test",
+      "when": "pre_commit",
+      "run": "mvn -q test"
+    },
+    {
+      "name": "backend:contract-consistency",
+      "when": "pre_commit",
+      "run": "bash .cursor/hooks/gates/contract-check.sh"
+    },
+    {
+      "name": "backend:db-change-consistency",
+      "when": "pre_commit",
+      "run": "bash .cursor/hooks/gates/db-change-check.sh"
+    }
+  ]
+}

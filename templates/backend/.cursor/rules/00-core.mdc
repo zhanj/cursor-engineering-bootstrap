@@ -1,0 +1,29 @@
+# 00-core（backend 总则）
+
+目标：确保后端任务交付遵循“复用优先、最小变更、可验证”的统一标准。
+
+## 输入
+- 任务描述与边界
+- 相关契约（`openapi.yaml` / `spec.md`）
+- 当前分支上下文（已有改动、风险点）
+- 能力索引（`capability-registry.md`）
+
+## 输出
+- 变更范围（文件清单 + 变更理由）
+- 复用依据（是否执行 `/api-search` 及结论）
+- 验证证据（命令与结果）
+
+## 反例（禁止）
+- 未做复用检索就新增接口或模块。
+- `/api-search` 未先检索 `capability-registry.md` 就直接看代码或新增接口。
+- 顺手重构无关代码，导致 diff 膨胀。
+- 修改接口行为但未更新契约或未解释“接口不变”依据。
+- 只给“已验证”结论，不提供可复现命令。
+
+## 检查清单
+- [ ] 已执行 `/api-search`，并记录候选方案。
+- [ ] `/api-search` 按顺序完成检索：`capability-registry.md` -> `contracts/openapi.yaml` -> 代码实现 -> `_raw_contracts/**`（仅兜底）。
+- [ ] `capability-registry.md` 检索按 `OwnerType` 优先级执行：`internal-self` -> `internal-other` -> `external-vendor`。
+- [ ] 仅修改任务必需文件，未扩大变更边界。
+- [ ] 若接口变更，已更新契约或给出不变依据。
+- [ ] 提供至少一条可复制验证命令。

@@ -1,0 +1,533 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMPLATES_DIR="$ROOT_DIR/templates"
+
+usage() {
+  echo "Usage:"
+  echo "  bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir <path>"
+  echo "  bash bin/cursor-init bundle  --mode backend|frontend|spec_center --target-dir <path>"
+  echo "  bash bin/cursor-init dry-run --mode backend|frontend|spec_center --use-current-dir"
+  echo "  bash bin/cursor-init bundle  --mode backend|frontend|spec_center --use-current-dir"
+  echo
+  echo "Optional flags (stage B):"
+  echo "  --target-dir <path>           Target project root directory (required unless --use-current-dir)"
+  echo "  --use-current-dir             Explicitly use current directory as target"
+  echo "  --with-spec-kit               Enable spec-kit environment checks"
+  echo "  --spec-kit-ai <agent>         Preferred spec-kit AI target (default: cursor-agent)"
+  echo "  --execute-spec-kit            Execute 'specify init .' when checks pass"
+  echo "  --spec-kit-dry-run            Print spec-kit init command without executing it"
+  echo "  --spec-kit-yes                Required confirmation for real spec-kit execution"
+  echo "  --spec-kit-force              Add '--force' to spec-kit init (high-risk, explicit only)"
+}
+
+CMD="${1:-}"
+MODE=""
+WITH_SPEC_KIT=0
+SPEC_KIT_AI="cursor-agent"
+EXECUTE_SPEC_KIT=0
+SPEC_KIT_DRY_RUN=0
+SPEC_KIT_YES=0
+SPEC_KIT_FORCE=0
+TARGET_DIR=""
+USE_CURRENT_DIR=0
+shift || true
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --mode"
+        usage
+        exit 1
+      fi
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --with-spec-kit)
+      WITH_SPEC_KIT=1
+      shift
+      ;;
+    --target-dir)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --target-dir"
+        usage
+        exit 1
+      fi
+      TARGET_DIR="${2:-}"
+      shift 2
+      ;;
+    --use-current-dir)
+      USE_CURRENT_DIR=1
+      shift
+      ;;
+    --spec-kit-ai)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --spec-kit-ai"
+        usage
+        exit 1
+      fi
+      SPEC_KIT_AI="${2:-}"
+      shift 2
+      ;;
+    --execute-spec-kit)
+      EXECUTE_SPEC_KIT=1
+      shift
+      ;;
+    --spec-kit-dry-run)
+      SPEC_KIT_DRY_RUN=1
+      shift
+      ;;
+    --spec-kit-yes)
+      SPEC_KIT_YES=1
+      shift
+      ;;
+    --spec-kit-force)
+      SPEC_KIT_FORCE=1
+      shift
+      ;;
+    *) shift ;;
+  esac
+done
+
+if [[ -z "${CMD}" || -z "${MODE}" ]]; then
+  usage
+  exit 1
+fi
+
+if [[ "${CMD}" != "dry-run" && "${CMD}" != "bundle" ]]; then
+  echo "Unknown command: ${CMD}"
+  usage
+  exit 1
+fi
+
+if [[ "${MODE}" != "backend" && "${MODE}" != "frontend" && "${MODE}" != "spec_center" ]]; then
+  echo "Unknown mode: ${MODE}"
+  usage
+  exit 1
+fi
+
+if [[ "${EXECUTE_SPEC_KIT}" == "1" && "${WITH_SPEC_KIT}" != "1" ]]; then
+  echo "--execute-spec-kit requires --with-spec-kit"
+  usage
+  exit 1
+fi
+
+if [[ "${SPEC_KIT_FORCE}" == "1" && "${EXECUTE_SPEC_KIT}" != "1" ]]; then
+  echo "--spec-kit-force requires --execute-spec-kit"
+  usage
+  exit 1
+fi
+
+if [[ "${SPEC_KIT_DRY_RUN}" == "1" && "${EXECUTE_SPEC_KIT}" != "1" ]]; then
+  echo "--spec-kit-dry-run requires --execute-spec-kit"
+  usage
+  exit 1
+fi
+
+if [[ "${SPEC_KIT_YES}" == "1" && "${EXECUTE_SPEC_KIT}" != "1" ]]; then
+  echo "--spec-kit-yes requires --execute-spec-kit"
+  usage
+  exit 1
+fi
+
+if [[ -n "${TARGET_DIR}" && "${USE_CURRENT_DIR}" == "1" ]]; then
+  echo "Use either --target-dir or --use-current-dir, not both."
+  usage
+  exit 1
+fi
+
+if [[ -z "${TARGET_DIR}" && "${USE_CURRENT_DIR}" != "1" ]]; then
+  echo "Missing target directory. Use --target-dir <path> or --use-current-dir."
+  usage
+  exit 1
+fi
+
+if [[ "${USE_CURRENT_DIR}" == "1" ]]; then
+  TARGET_DIR="."
+fi
+
+if [[ ! -d "${TARGET_DIR}" ]]; then
+  echo "Target directory does not exist: ${TARGET_DIR}"
+  exit 1
+fi
+
+PROJECT_DIR="$(cd "${TARGET_DIR}" && pwd)"
+if [[ "${PROJECT_DIR}" == "${ROOT_DIR}" && "${USE_CURRENT_DIR}" == "1" ]]; then
+  echo "Warning: target directory is the cursor-init repository itself."
+  echo "Tip: run from your target project root before using --use-current-dir."
+fi
+
+cd "${PROJECT_DIR}"
+
+OUT_DIR="${PROJECT_DIR}/_cursor_init"
+mkdir -p "${OUT_DIR}"
+
+REPORT="${OUT_DIR}/report.md"
+TREE="${OUT_DIR}/proposed_tree.md"
+PLAN="${OUT_DIR}/apply_plan.md"
+HOOKS_SUGGESTED="${OUT_DIR}/hooks.suggested.json"
+
+SEARCH_EXCLUDES=(
+  ".git"
+  "node_modules"
+  "dist"
+  "build"
+  "target"
+  ".idea"
+  ".vscode"
+  "_cursor_init"
+)
+
+search_pattern() {
+  local pattern="$1"
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "ripgrep (rg) is required. Please install rg and retry."
+    exit 1
+  fi
+  local rg_args=()
+  local ex
+  for ex in "${SEARCH_EXCLUDES[@]}"; do
+    rg_args+=(--glob "!${ex}/**")
+  done
+  rg -n -i "${pattern}" . "${rg_args[@]}" >/dev/null 2>&1
+}
+
+detect_backend() {
+  local build="unknown"
+  [[ -f pom.xml ]] && build="maven"
+  [[ -f build.gradle || -f build.gradle.kts ]] && build="gradle"
+
+  local dao="unknown"
+  search_pattern "mybatis-plus" && dao="mybatis-plus" || true
+  if [[ "${dao}" == "unknown" ]]; then
+    search_pattern "mybatis" && dao="mybatis" || true
+  fi
+  if [[ "${dao}" == "unknown" ]]; then
+    search_pattern "spring-data-jpa" && dao="jpa" || true
+  fi
+
+  local migration="unknown"
+  [[ -d src/main/resources/db/migration || -d db/migration ]] && migration="flyway"
+  [[ -d src/main/resources/db/changelog || -f liquibase.properties ]] && migration="liquibase"
+
+  echo "$build" "$dao" "$migration"
+}
+
+detect_frontend() {
+  local pm="unknown"
+  [[ -f pnpm-lock.yaml ]] && pm="pnpm"
+  [[ -f yarn.lock ]] && pm="yarn"
+  [[ -f package-lock.json ]] && pm="npm"
+
+  local ts="no"
+  [[ -f tsconfig.json ]] && ts="yes"
+
+  echo "$pm" "$ts"
+}
+
+write_skeletons() {
+  cat > "${REPORT}" <<'EOF'
+# cursor-init 扫描报告（v2）
+
+> 说明：本报告由 cursor-init dry-run 生成。  
+> v2 为离线轻扫描，仅依据仓库文件指纹推断（不会执行构建命令）。
+
+## 1) 项目识别
+
+## 2) 建议选择的模板
+
+## 3) 需要人工确认项（TODO）
+
+EOF
+
+  cat > "${TREE}" <<'EOF'
+# 建议文件树（proposed tree）
+
+> 说明：本文件列出建议新增的 .cursor 资产与 Spec Center 资产。
+
+EOF
+
+  cat > "${PLAN}" <<'EOF'
+# 落库计划（apply plan）
+
+原则：
+- 不覆盖已有文件
+- 冲突时生成 *.v2 文件并标注 TODO
+- 建议以 PR 方式落库（review 后合并）
+
+待执行：
+- [ ] 复制 patch_bundle 到目标位置
+- [ ] 调整 hooks 命令（mvn/gradle、pnpm/yarn/npm 等）
+- [ ] 配置 Spec Center 的获取方式（submodule/镜像/只读拉取）
+- [ ] 补齐 capability-registry（核心能力 + 同义词）
+- [ ] 在团队内发布《使用规范》（PR 模板 + 复用优先 + 契约一致门禁）
+
+EOF
+}
+
+check_spec_kit_env() {
+  SPEC_KIT_STATUS="not_requested"
+  SPEC_KIT_CHECK_RESULT="not_requested"
+  SPEC_KIT_INIT_RESULT="not_requested"
+  SPEC_KIT_INIT_CMD="not_requested"
+  SPEC_KIT_HINT="Use --with-spec-kit to enable checks."
+
+  if [[ "${WITH_SPEC_KIT}" != "1" ]]; then
+    return 0
+  fi
+
+  SPEC_KIT_STATUS="requested"
+  SPEC_KIT_HINT="spec-kit checks enabled."
+
+  if command -v specify >/dev/null 2>&1; then
+    if specify check >/dev/null 2>&1; then
+      SPEC_KIT_CHECK_RESULT="ok"
+      SPEC_KIT_HINT="specify available."
+    else
+      SPEC_KIT_CHECK_RESULT="degraded"
+      SPEC_KIT_HINT="specify found but check reported issues. Run: specify check"
+    fi
+  else
+    SPEC_KIT_CHECK_RESULT="missing_specify"
+    if command -v uv >/dev/null 2>&1; then
+      SPEC_KIT_HINT="Install: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git"
+    else
+      SPEC_KIT_HINT="Install uv first, then install specify-cli from github/spec-kit."
+    fi
+  fi
+}
+
+run_spec_kit_init() {
+  if [[ "${WITH_SPEC_KIT}" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ "${EXECUTE_SPEC_KIT}" != "1" ]]; then
+    SPEC_KIT_INIT_RESULT="skipped"
+    SPEC_KIT_INIT_CMD="specify init . --ai ${SPEC_KIT_AI}"
+    SPEC_KIT_HINT="${SPEC_KIT_HINT} Next step (manual): ${SPEC_KIT_INIT_CMD}"
+    return 0
+  fi
+
+  local init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}")
+  if [[ "${SPEC_KIT_FORCE}" == "1" ]]; then
+    init_cmd+=("--force")
+  fi
+
+  SPEC_KIT_INIT_CMD="${init_cmd[*]}"
+  if [[ "${SPEC_KIT_DRY_RUN}" == "1" ]]; then
+    SPEC_KIT_INIT_RESULT="dry_run"
+    SPEC_KIT_HINT="spec-kit dry-run only; execute manually: ${SPEC_KIT_INIT_CMD}"
+    echo "spec-kit dry-run: ${SPEC_KIT_INIT_CMD}"
+    return 0
+  fi
+
+  if [[ "${SPEC_KIT_YES}" != "1" ]]; then
+    SPEC_KIT_INIT_RESULT="blocked_missing_confirmation"
+    echo "spec-kit execution is blocked for safety."
+    echo "Re-run with --spec-kit-yes to confirm execution."
+    exit 1
+  fi
+
+  if ! command -v specify >/dev/null 2>&1; then
+    SPEC_KIT_INIT_RESULT="failed_missing_specify"
+    echo "spec-kit execution requested but 'specify' is not installed."
+    exit 1
+  fi
+
+  echo "Running spec-kit init: ${SPEC_KIT_INIT_CMD}"
+  if "${init_cmd[@]}" >/dev/null 2>&1; then
+    SPEC_KIT_INIT_RESULT="ok"
+    SPEC_KIT_HINT="spec-kit init executed successfully."
+  else
+    SPEC_KIT_INIT_RESULT="failed"
+    echo "spec-kit init failed. Retry manually: ${SPEC_KIT_INIT_CMD}"
+    exit 1
+  fi
+}
+
+write_hooks_suggested_backend() {
+  local build="$1"
+  local unit_cmd="mvn -q test"
+  if [[ "${build}" == "gradle" ]]; then
+    if [[ -f "./gradlew" ]]; then
+      unit_cmd="./gradlew test --no-daemon"
+    else
+      unit_cmd="gradle test"
+    fi
+  fi
+
+  cat > "${HOOKS_SUGGESTED}" <<EOF
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "backend:unit-test",
+      "when": "pre_commit",
+      "run": "${unit_cmd}"
+    },
+    {
+      "name": "backend:contract-consistency",
+      "when": "pre_commit",
+      "run": "bash .cursor/hooks/gates/contract-check.sh"
+    },
+    {
+      "name": "backend:db-change-consistency",
+      "when": "pre_commit",
+      "run": "bash .cursor/hooks/gates/db-change-check.sh"
+    }
+  ]
+}
+EOF
+}
+
+write_hooks_suggested_frontend() {
+  local pm="$1"
+  local lint_cmd="pnpm -s lint"
+  local tsc_cmd="pnpm -s tsc"
+
+  if [[ "${pm}" == "yarn" ]]; then
+    lint_cmd="yarn -s lint"
+    tsc_cmd="yarn -s tsc"
+  elif [[ "${pm}" == "npm" ]]; then
+    lint_cmd="npm run -s lint"
+    tsc_cmd="npm run -s tsc"
+  elif [[ "${pm}" != "pnpm" ]]; then
+    lint_cmd="<replace-with-your-pm> lint"
+    tsc_cmd="<replace-with-your-pm> tsc"
+  fi
+
+  cat > "${HOOKS_SUGGESTED}" <<EOF
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "frontend:lint",
+      "when": "pre_commit",
+      "run": "${lint_cmd}"
+    },
+    {
+      "name": "frontend:tsc",
+      "when": "pre_commit",
+      "run": "${tsc_cmd}"
+    }
+  ]
+}
+EOF
+}
+
+propose_tree_backend() {
+  cat >> "${TREE}" <<'EOF'
+## backend（建议新增）
+- .cursor/
+  - rules/
+  - commands/
+  - hooks/
+  - skills/
+- .cursorignore
+- PR_TEMPLATE.md（可选）
+EOF
+}
+
+propose_tree_frontend() {
+  cat >> "${TREE}" <<'EOF'
+## frontend（建议新增）
+- .cursor/
+  - rules/
+  - commands/
+  - hooks/
+  - skills/
+- .cursorignore
+- PR_TEMPLATE.md（可选）
+EOF
+}
+
+propose_tree_spec_center() {
+  cat >> "${TREE}" <<'EOF'
+## spec_center（建议新增）
+- capability-registry.md
+- _raw_contracts/ (Apifox exports, do-not-edit)
+- <service>/spec.md
+- <service>/contracts/openapi.yaml
+EOF
+}
+
+bundle_templates() {
+  local src="${TEMPLATES_DIR}/${MODE}"
+  local dst="${OUT_DIR}/patch_bundle/${MODE}"
+  mkdir -p "${dst}"
+  if [[ ! -d "${src}" ]]; then
+    echo "Template not found: ${src}"
+    exit 1
+  fi
+  cp -R "${src}/." "${dst}/"
+  echo "Patch bundle written to ${dst}"
+}
+
+main() {
+  write_skeletons
+  check_spec_kit_env
+  run_spec_kit_init
+  if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
+    echo "- [ ] 处理 spec-kit 环境检查结果（见 report.md 的 spec_kit_* 字段）" >> "${PLAN}"
+    if [[ "${EXECUTE_SPEC_KIT}" == "1" ]]; then
+      echo "- [ ] 校验 spec-kit 初始化结果（spec_kit_init 字段应为 ok）" >> "${PLAN}"
+    fi
+  fi
+
+  if [[ "${MODE}" == "backend" ]]; then
+    read -r build dao mig < <(detect_backend)
+    echo "- build: ${build}" >> "${REPORT}"
+    echo "- dao: ${dao}" >> "${REPORT}"
+    echo "- migration: ${mig}" >> "${REPORT}"
+    echo "- hooks_suggested: ${HOOKS_SUGGESTED}" >> "${REPORT}"
+    write_hooks_suggested_backend "${build}"
+    propose_tree_backend
+  elif [[ "${MODE}" == "frontend" ]]; then
+    read -r pm ts < <(detect_frontend)
+    echo "- package_manager: ${pm}" >> "${REPORT}"
+    echo "- typescript: ${ts}" >> "${REPORT}"
+    echo "- hooks_suggested: ${HOOKS_SUGGESTED}" >> "${REPORT}"
+    write_hooks_suggested_frontend "${pm}"
+    propose_tree_frontend
+  elif [[ "${MODE}" == "spec_center" ]]; then
+    cat > "${HOOKS_SUGGESTED}" <<'EOF'
+{
+  "note": "spec_center mode has no default hooks; maintain CI checks in the spec repo."
+}
+EOF
+    propose_tree_spec_center
+  else
+    echo "Unknown mode: ${MODE}"
+    exit 1
+  fi
+
+  echo "- spec_kit_requested: ${WITH_SPEC_KIT}" >> "${REPORT}"
+  echo "- spec_kit_ai: ${SPEC_KIT_AI}" >> "${REPORT}"
+  echo "- spec_kit_execute_requested: ${EXECUTE_SPEC_KIT}" >> "${REPORT}"
+  echo "- spec_kit_dry_run: ${SPEC_KIT_DRY_RUN}" >> "${REPORT}"
+  echo "- spec_kit_yes: ${SPEC_KIT_YES}" >> "${REPORT}"
+  echo "- spec_kit_force: ${SPEC_KIT_FORCE}" >> "${REPORT}"
+  echo "- spec_kit_status: ${SPEC_KIT_STATUS}" >> "${REPORT}"
+  echo "- spec_kit_check: ${SPEC_KIT_CHECK_RESULT}" >> "${REPORT}"
+  echo "- spec_kit_init: ${SPEC_KIT_INIT_RESULT}" >> "${REPORT}"
+  echo "- spec_kit_init_cmd: ${SPEC_KIT_INIT_CMD}" >> "${REPORT}"
+  echo "- spec_kit_hint: ${SPEC_KIT_HINT}" >> "${REPORT}"
+
+  if [[ "${CMD}" == "bundle" ]]; then
+    bundle_templates
+  fi
+
+  echo "Done. Outputs:"
+  echo " - ${REPORT}"
+  echo " - ${TREE}"
+  echo " - ${PLAN}"
+  echo " - ${HOOKS_SUGGESTED}"
+  if [[ "${CMD}" == "bundle" ]]; then
+    echo " - ${OUT_DIR}/patch_bundle/"
+  fi
+}
+
+main
