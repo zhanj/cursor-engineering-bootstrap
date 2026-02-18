@@ -133,6 +133,7 @@ bash bin/cursor-init dry-run --mode backend|frontend|spec_center --use-current-d
 bash bin/cursor-init bundle  --mode backend|frontend|spec_center --use-current-dir
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-yes
+bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes --overwrite
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-dry-run
 bash bin/cursor-init bundle --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bootstrap-readme
 ```
@@ -146,13 +147,18 @@ spec-kit 集成参数：
 - `--execute-spec-kit`：执行 `specify init . --ai <agent>`（默认关闭）
 - `--spec-kit-dry-run`：仅打印将执行的 `specify init` 命令（不执行，需与 `--execute-spec-kit` 同时使用）
 - `--spec-kit-yes`：执行前显式确认（真实执行时必填）
-- `--spec-kit-force`：在执行时追加 `--force`（高风险，需与 `--execute-spec-kit` 同时使用）
+- `--overwrite`：允许覆盖已存在的 spec-kit 资产（默认不覆盖）
+- `--spec-kit-force`：兼容参数，等价于 `--overwrite`（高风险，需与 `--execute-spec-kit` 同时使用）
 - `--no-bootstrap-readme`：不生成 bootstrap README 快照（默认会生成）
 
 说明：
 
 - 阶段 A（低风险）：只使用 `--with-spec-kit`（检查与建议，不执行初始化）
 - 阶段 B（可选）：增加 `--execute-spec-kit` 执行初始化
+- 安全默认：若检测到 `.cursor`、`.vscode`、`PR_TEMPLATE.md`、`doc/DEV.md`、`spec_center` 已存在：
+  - 若 `.specify` 已存在：跳过初始化，避免覆盖
+  - 若 `.specify` 缺失：在临时目录执行 spec-kit 初始化，再“仅补齐缺失文件”到目标目录（不覆盖现有文件）
+- 执行校验：若 `specify init` 返回成功但未生成 `.specify/`，会标记为失败并提示查看 `specify-init.log`
 
 ### `dry-run` 会产出什么
 
@@ -163,6 +169,7 @@ spec-kit 集成参数：
 - `apply_plan.md`：落库步骤与人工确认项
 - `hooks.suggested.json`：自动推断的 hooks 命令建议
 - `cursor-bootstrap-readme.md`：bootstrap 说明快照（供 Cursor 检索，默认生成；可用 `--no-bootstrap-readme` 关闭）
+- `specify-init.log`：spec-kit 初始化执行日志（仅 `--with-spec-kit` 时生成）
 
 若启用 `--with-spec-kit`，`report.md` 还会包含：
 
@@ -174,8 +181,9 @@ spec-kit 集成参数：
 - `spec_kit_dry_run`：是否只做 spec-kit 命令预演
 - `spec_kit_yes`：是否提供执行确认开关
 - `spec_kit_force`：是否启用 force 模式
-- `spec_kit_init`：初始化执行结果（not_requested/skipped/dry_run/ok/failed/blocked_missing_confirmation）
+- `spec_kit_init`：初始化执行结果（not_requested/skipped/skipped_existing_assets/dry_run/ok/ok_non_overwrite_merge/failed/failed_missing_specify_dir/blocked_missing_confirmation）
 - `spec_kit_init_cmd`：执行或建议的初始化命令
+- `spec_kit_log`：spec-kit 初始化日志路径（排查失败时优先查看）
 - `spec_kit_hint`：下一步建议（安装或执行提示）
 
 ### 关于 `/init-scan`（常见误解）

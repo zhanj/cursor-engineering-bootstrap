@@ -19,6 +19,7 @@ usage() {
   echo "  --execute-spec-kit            Execute 'specify init .' when checks pass"
   echo "  --spec-kit-dry-run            Print spec-kit init command without executing it"
   echo "  --spec-kit-yes                Required confirmation for real spec-kit execution"
+  echo "  --overwrite                   Allow overwriting existing spec-kit assets"
   echo "  --spec-kit-force              Add '--force' to spec-kit init (high-risk, explicit only)"
   echo "  --no-bootstrap-readme         Do not include bootstrap README in generated outputs"
 }
@@ -31,6 +32,7 @@ EXECUTE_SPEC_KIT=0
 SPEC_KIT_DRY_RUN=0
 SPEC_KIT_YES=0
 SPEC_KIT_FORCE=0
+OVERWRITE=0
 TARGET_DIR=""
 USE_CURRENT_DIR=0
 INCLUDE_BOOTSTRAP_README=1
@@ -85,8 +87,13 @@ while [[ $# -gt 0 ]]; do
       SPEC_KIT_YES=1
       shift
       ;;
+    --overwrite)
+      OVERWRITE=1
+      shift
+      ;;
     --spec-kit-force)
       SPEC_KIT_FORCE=1
+      OVERWRITE=1
       shift
       ;;
     --no-bootstrap-readme)
@@ -175,6 +182,7 @@ TREE="${OUT_DIR}/proposed_tree.md"
 PLAN="${OUT_DIR}/apply_plan.md"
 HOOKS_SUGGESTED="${OUT_DIR}/hooks.suggested.json"
 BOOTSTRAP_README_OUT="${OUT_DIR}/cursor-bootstrap-readme.md"
+SPEC_KIT_INIT_LOG="${OUT_DIR}/specify-init.log"
 
 SEARCH_EXCLUDES=(
   ".git"
@@ -279,6 +287,8 @@ check_spec_kit_env() {
   SPEC_KIT_CHECK_RESULT="not_requested"
   SPEC_KIT_INIT_RESULT="not_requested"
   SPEC_KIT_INIT_CMD="not_requested"
+  SPEC_KIT_EXISTING_ASSETS="none"
+  SPEC_KIT_LOG_PATH="${SPEC_KIT_INIT_LOG}"
   SPEC_KIT_HINT="Use --with-spec-kit to enable checks."
 
   if [[ "${WITH_SPEC_KIT}" != "1" ]]; then
@@ -311,15 +321,80 @@ run_spec_kit_init() {
     return 0
   fi
 
+  mkdir -p "${OUT_DIR}"
+  : > "${SPEC_KIT_INIT_LOG}"
+  echo "[spec-kit] run_spec_kit_init started at $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "${SPEC_KIT_INIT_LOG}"
+  echo "[spec-kit] project_dir=${PROJECT_DIR}" >> "${SPEC_KIT_INIT_LOG}"
+
   if [[ "${EXECUTE_SPEC_KIT}" != "1" ]]; then
     SPEC_KIT_INIT_RESULT="skipped"
     SPEC_KIT_INIT_CMD="specify init . --ai ${SPEC_KIT_AI}"
     SPEC_KIT_HINT="${SPEC_KIT_HINT} Next step (manual): ${SPEC_KIT_INIT_CMD}"
+    echo "[spec-kit] skipped: execute flag not set" >> "${SPEC_KIT_INIT_LOG}"
+    echo "[spec-kit] next_step=${SPEC_KIT_INIT_CMD}" >> "${SPEC_KIT_INIT_LOG}"
     return 0
   fi
 
+  # Safe by default: if spec-kit assets already exist, avoid overwriting.
+  # If .specify is missing, bootstrap in temp dir and merge missing files only.
+  local existing_assets=()
+  local maybe_asset
+  for maybe_asset in ".cursor" ".vscode" "PR_TEMPLATE.md" "doc/DEV.md" "spec_center"; do
+    if [[ -e "${maybe_asset}" ]]; then
+      existing_assets+=("${maybe_asset}")
+    fi
+  done
+  if [[ ${#existing_assets[@]} -gt 0 ]]; then
+    SPEC_KIT_EXISTING_ASSETS="$(IFS=,; echo "${existing_assets[*]}")"
+    if [[ "${OVERWRITE}" != "1" ]]; then
+      if [[ -d ".specify" ]]; then
+        SPEC_KIT_INIT_RESULT="skipped_existing_assets"
+        SPEC_KIT_HINT="Existing spec-kit assets detected (${SPEC_KIT_EXISTING_ASSETS}). .specify already exists, so init is skipped to avoid overwriting."
+        echo "spec-kit init skipped to avoid overwriting existing files."
+        echo "Detected assets: ${SPEC_KIT_EXISTING_ASSETS}"
+        echo "[spec-kit] skipped_existing_assets: ${SPEC_KIT_EXISTING_ASSETS}" >> "${SPEC_KIT_INIT_LOG}"
+        echo "[spec-kit] .specify already exists, no init executed" >> "${SPEC_KIT_INIT_LOG}"
+        return 0
+      fi
+
+      local tmpdir
+      tmpdir="$(mktemp -d)"
+      local temp_init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--force" "--no-git")
+      SPEC_KIT_INIT_CMD="${temp_init_cmd[*]} (temp bootstrap + non-overwrite merge)"
+      echo "Existing assets detected (${SPEC_KIT_EXISTING_ASSETS}), .specify missing."
+      echo "Running non-overwrite bootstrap from temp directory."
+      echo "[spec-kit] existing_assets=${SPEC_KIT_EXISTING_ASSETS}" >> "${SPEC_KIT_INIT_LOG}"
+      echo "[spec-kit] .specify missing, run temp bootstrap: ${temp_init_cmd[*]}" >> "${SPEC_KIT_INIT_LOG}"
+      if (cd "${tmpdir}" && "${temp_init_cmd[@]}") >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
+        cp -R -n "${tmpdir}/." "${PROJECT_DIR}/"
+        rm -rf "${tmpdir}"
+        if [[ -d ".specify" ]]; then
+          SPEC_KIT_INIT_RESULT="ok_non_overwrite_merge"
+          SPEC_KIT_HINT="spec-kit assets bootstrapped in temp dir and merged without overwriting existing files."
+          echo "[spec-kit] temp bootstrap merge success, .specify exists" >> "${SPEC_KIT_INIT_LOG}"
+          return 0
+        else
+          SPEC_KIT_INIT_RESULT="failed_missing_specify_dir"
+          SPEC_KIT_HINT="Temp bootstrap finished but .specify is still missing after non-overwrite merge. See log: ${SPEC_KIT_INIT_LOG}"
+          echo "spec-kit bootstrap completed but .specify directory was not created."
+          echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+          echo "[spec-kit] ERROR: temp bootstrap finished but .specify missing" >> "${SPEC_KIT_INIT_LOG}"
+          exit 1
+        fi
+      else
+        rm -rf "${tmpdir}"
+        SPEC_KIT_INIT_RESULT="failed"
+        SPEC_KIT_HINT="spec-kit temp bootstrap failed. See log: ${SPEC_KIT_INIT_LOG}"
+        echo "spec-kit temp bootstrap failed."
+        echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+        echo "[spec-kit] ERROR: temp bootstrap failed" >> "${SPEC_KIT_INIT_LOG}"
+        exit 1
+      fi
+    fi
+  fi
+
   local init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}")
-  if [[ "${SPEC_KIT_FORCE}" == "1" ]]; then
+  if [[ "${OVERWRITE}" == "1" ]]; then
     init_cmd+=("--force")
   fi
 
@@ -328,6 +403,7 @@ run_spec_kit_init() {
     SPEC_KIT_INIT_RESULT="dry_run"
     SPEC_KIT_HINT="spec-kit dry-run only; execute manually: ${SPEC_KIT_INIT_CMD}"
     echo "spec-kit dry-run: ${SPEC_KIT_INIT_CMD}"
+    echo "[spec-kit] dry_run: ${SPEC_KIT_INIT_CMD}" >> "${SPEC_KIT_INIT_LOG}"
     return 0
   fi
 
@@ -335,22 +411,38 @@ run_spec_kit_init() {
     SPEC_KIT_INIT_RESULT="blocked_missing_confirmation"
     echo "spec-kit execution is blocked for safety."
     echo "Re-run with --spec-kit-yes to confirm execution."
+    echo "[spec-kit] blocked: missing --spec-kit-yes" >> "${SPEC_KIT_INIT_LOG}"
     exit 1
   fi
 
   if ! command -v specify >/dev/null 2>&1; then
     SPEC_KIT_INIT_RESULT="failed_missing_specify"
     echo "spec-kit execution requested but 'specify' is not installed."
+    echo "[spec-kit] ERROR: specify command not found" >> "${SPEC_KIT_INIT_LOG}"
     exit 1
   fi
 
   echo "Running spec-kit init: ${SPEC_KIT_INIT_CMD}"
-  if "${init_cmd[@]}" >/dev/null 2>&1; then
-    SPEC_KIT_INIT_RESULT="ok"
-    SPEC_KIT_HINT="spec-kit init executed successfully."
+  echo "[spec-kit] run direct init: ${SPEC_KIT_INIT_CMD}" >> "${SPEC_KIT_INIT_LOG}"
+  if "${init_cmd[@]}" >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
+    if [[ -d ".specify" ]]; then
+      SPEC_KIT_INIT_RESULT="ok"
+      SPEC_KIT_HINT="spec-kit init executed successfully."
+      echo "[spec-kit] direct init success, .specify exists" >> "${SPEC_KIT_INIT_LOG}"
+    else
+      SPEC_KIT_INIT_RESULT="failed_missing_specify_dir"
+      SPEC_KIT_HINT="spec-kit init command finished but .specify was not found. See log: ${SPEC_KIT_INIT_LOG}"
+      echo "spec-kit init completed but .specify directory was not created."
+      echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+      echo "[spec-kit] ERROR: direct init finished but .specify missing" >> "${SPEC_KIT_INIT_LOG}"
+      exit 1
+    fi
   else
     SPEC_KIT_INIT_RESULT="failed"
+    SPEC_KIT_HINT="spec-kit init failed. See log: ${SPEC_KIT_INIT_LOG}"
     echo "spec-kit init failed. Retry manually: ${SPEC_KIT_INIT_CMD}"
+    echo "See log for details: ${SPEC_KIT_INIT_LOG}"
+    echo "[spec-kit] ERROR: direct init command failed" >> "${SPEC_KIT_INIT_LOG}"
     exit 1
   fi
 }
@@ -545,10 +637,13 @@ EOF
   echo "- spec_kit_dry_run: ${SPEC_KIT_DRY_RUN}" >> "${REPORT}"
   echo "- spec_kit_yes: ${SPEC_KIT_YES}" >> "${REPORT}"
   echo "- spec_kit_force: ${SPEC_KIT_FORCE}" >> "${REPORT}"
+  echo "- overwrite: ${OVERWRITE}" >> "${REPORT}"
   echo "- spec_kit_status: ${SPEC_KIT_STATUS}" >> "${REPORT}"
   echo "- spec_kit_check: ${SPEC_KIT_CHECK_RESULT}" >> "${REPORT}"
   echo "- spec_kit_init: ${SPEC_KIT_INIT_RESULT}" >> "${REPORT}"
   echo "- spec_kit_init_cmd: ${SPEC_KIT_INIT_CMD}" >> "${REPORT}"
+  echo "- spec_kit_existing_assets: ${SPEC_KIT_EXISTING_ASSETS}" >> "${REPORT}"
+  echo "- spec_kit_log: ${SPEC_KIT_LOG_PATH}" >> "${REPORT}"
   echo "- spec_kit_hint: ${SPEC_KIT_HINT}" >> "${REPORT}"
   if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
     echo "- bootstrap_readme: ${BOOTSTRAP_README_OUT}" >> "${REPORT}"
@@ -565,6 +660,9 @@ EOF
   echo " - ${TREE}"
   echo " - ${PLAN}"
   echo " - ${HOOKS_SUGGESTED}"
+  if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
+    echo " - ${SPEC_KIT_INIT_LOG}"
+  fi
   if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
     echo " - ${BOOTSTRAP_README_OUT}"
   fi
