@@ -246,7 +246,7 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 ### 提交前
 
 - 运行 hooks 对应验证（lint/tsc/test + gates）
-- 使用 `PR_TEMPLATE.md` 填写交付证据
+- 使用仓库根目录 `PR_TEMPLATE.md` 填写交付证据（字段与 `.cursor/commands/*` 输出一一对应，可直接粘贴）
 
 ### PR 填写建议（v2.1.3+ 已对齐）
 
