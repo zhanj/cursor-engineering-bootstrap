@@ -16,6 +16,7 @@
    - 业务目标与边界
    - API/DB/跨服务影响
    - 验证与回滚要求
+   - 若涉及 DAO 开发或数据库连接改动，优先参考工程内 DB schema 文件（如 `schema.sql`、`db/migration/*`、`db/changelog/*`）再落代码。
 3. 执行 `/api-search`，产出可直接粘贴 PR `1) 复用依据` 的内容。
 4. 执行 `/implement-task`，完成最小闭环代码实现。
 5. 若涉及契约变化，更新 `openapi.yaml`（并在输出中写明影响 endpoint）。

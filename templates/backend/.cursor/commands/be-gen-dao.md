@@ -3,7 +3,7 @@
 目标：基于 schema/migration 生成或更新 DAO 层，保持与表结构一致。
 
 ## 输入
-- migration SQL（Flyway/Liquibase）
+- migration SQL（Flyway/Liquibase）与工程内 DB schema 文件（如 `schema.sql`）
 - 目标表与主键、索引信息
 - 现有 DAO/Mapper 命名规范
 
@@ -21,4 +21,5 @@
 
 ## 禁止事项
 - 跳过 migration 直接改持久层。
+- 跳过工程内 schema/migration 文件，仅凭猜测修改 DAO 或连接配置。
 - 生成大量无关 CRUD 代码。
