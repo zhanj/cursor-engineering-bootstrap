@@ -333,6 +333,22 @@ make ci
 make ci-full
 ```
 
+### E2E 演练（真实流程）
+
+用于“真实构造样例项目 -> 初始化脚手架 -> 演练两条研发路径 -> 验证 gate”：
+
+```bash
+make e2e
+# 或仅执行开发路径演练
+make e2e-dev-path
+```
+
+说明：
+
+- E2E 脚本会在临时目录创建一个 backend 样例项目并自动清理。
+- 默认会执行 `specify init`（需本机已安装 `specify`）。
+- 如需保留临时目录排查，可设置：`E2E_KEEP_WORKDIR=1 make e2e-dev-path`。
+
 或使用 Makefile（推荐）：
 
 ```bash

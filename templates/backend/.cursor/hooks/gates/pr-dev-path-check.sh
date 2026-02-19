@@ -65,8 +65,8 @@ fi
 
 main_checked=0
 fast_checked=0
-echo "${body}" | rg -q "${main_checked_re}" && main_checked=1 || true
-echo "${body}" | rg -q "${fast_checked_re}" && fast_checked=1 || true
+echo "${body}" | rg -q -- "${main_checked_re}" && main_checked=1 || true
+echo "${body}" | rg -q -- "${fast_checked_re}" && fast_checked=1 || true
 
 if [[ "${main_checked}" -eq 0 && "${fast_checked}" -eq 0 ]]; then
   fail_or_warn "Missing development path selection. Check exactly one of: 主流程 / 快速路径." || exit 1
@@ -83,19 +83,22 @@ if [[ "${STAGE}" -lt 2 ]]; then
   exit 0
 fi
 
+# Stage 2 evidence must come from PR evidence content, not from the path checkbox label.
+body_for_evidence="$(printf "%s\n" "${body}" | rg -v "主流程（Spec-kit 驱动|快速路径（小改动")"
+
 if [[ "${main_checked}" -eq 1 ]]; then
-  echo "${body}" | rg -q "/bridge-implement|/speckit\.specify|/speckit\.plan|/speckit\.tasks" || {
+  echo "${body_for_evidence}" | rg -q -- "/bridge-implement|/speckit\.specify|/speckit\.plan|/speckit\.tasks" || {
     fail_or_warn "Main path selected but spec-kit/bridge evidence is missing." || exit 1
     exit 0
   }
 fi
 
 if [[ "${fast_checked}" -eq 1 ]]; then
-  echo "${body}" | rg -q "/api-search" || {
+  echo "${body_for_evidence}" | rg -q -- "/api-search" || {
     fail_or_warn "Fast path selected but /api-search evidence is missing." || exit 1
     exit 0
   }
-  echo "${body}" | rg -q "/implement-task" || {
+  echo "${body_for_evidence}" | rg -q -- "/implement-task" || {
     fail_or_warn "Fast path selected but /implement-task evidence is missing." || exit 1
     exit 0
   }
