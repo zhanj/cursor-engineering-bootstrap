@@ -13,8 +13,13 @@
 2. 对比 `.cursor/hooks/hooks.json` 与 `_cursor_init/hooks.suggested.json`。
 3. 校准规则中的目录落点（views/components/api/router/store）。
 4. 检查 API 调用风格是否统一（request 封装、错误处理、鉴权头）。
-5. 检查 `spec_center/capability-registry.md` 与 `<service>/contracts/openapi.yaml` 是否可访问；缺失时明确标注“待建”并给出创建建议。
-6. 检查 `.specify/memory/constitution.md` 是否存在；若缺失，先按 `docs/speckit-constitution-prompt.md` 执行 `/speckit.constitution`，并确认文件已生成后再继续。
+5. 对 `spec_center` 与 `constitution` 执行“补缺不覆盖”策略（与 `--overwrite` 开关对齐）：
+   - `spec_center` 缺失 + `overwrite=off`：补建最小资产（至少 `capability-registry.md` 与 `<service>/contracts/openapi.yaml` 占位）。
+   - `spec_center` 已存在 + `overwrite=off`：保持现状，不覆盖。
+   - `spec_center` 已存在 + `overwrite=on`：允许按团队策略覆盖/重建（需在输出中标注覆盖范围）。
+   - `constitution` 缺失 + `overwrite=off`：按 `docs/speckit-constitution-prompt.md` 执行 `/speckit.constitution` 并补建。
+   - `constitution` 已存在 + `overwrite=off`：保持现状，不覆盖。
+   - `constitution` 已存在 + `overwrite=on`：允许更新（需在输出中标注差异与原因）。
 7. 输出落库清单与风险点。
 
 ## 输出格式（必须）
@@ -24,6 +29,7 @@
 - `验证命令`
 - `Spec 资产状态`（按状态词输出 `capability-registry/openapi`：`exists`/`missing`/`unreadable`/`path_mismatch`，并标注“待建”项）
 - `Constitution 状态`（按状态词输出 `.specify/memory/constitution.md`：`exists`/`missing`/`unreadable`/`path_mismatch`，以及处理结果：已补建/待人工处理）
+- `覆盖开关状态`（`overwrite=on/off` 与实际动作：`created`/`skipped`/`overwritten`）
 
 ## 禁止事项
 - 不直接改业务代码。
