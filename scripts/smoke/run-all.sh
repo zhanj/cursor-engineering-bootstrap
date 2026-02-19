@@ -8,6 +8,7 @@ declare -a STEPS=(
   "02-gates-behavior.sh|gates behavior"
   "03-template-integrity.sh|template integrity"
   "04-cursor-bootstrap.sh|cursor-bootstrap flow"
+  "05-cursor-cleanup.sh|cursor-cleanup flow"
 )
 
 echo "[smoke] start"

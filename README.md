@@ -280,6 +280,23 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
 - `_cursor_init/bootstrap-report.md`：一键编排执行摘要
 - `_cursor_init/init-scan-mirror.md`：镜像版 init-scan 状态输出（rules/commands/hooks/spec/constitution）
 
+## 生成物清理（bin/cursor-cleanup）
+
+用于清理脚本生成产物，默认 `dry-run` 仅预览，不会删除文件。
+
+```bash
+# 仅预览（默认）
+bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders
+
+# 执行删除
+bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders --apply
+```
+
+- 默认清理：`_cursor_init/`
+- 可选清理：`--include-spec-center-placeholders`
+  - 仅删除带 marker 的占位文件（由 `--enrich-spec-center` 生成）
+  - 包含：`capability-registry.md`、`_raw_contracts/README.md`、带 `x-generated-by` 的占位 `openapi.yaml`
+
 ## 推荐落地顺序（团队视角）
 
 1. 先落地 Spec Center（契约与能力索引中心）
@@ -360,7 +377,7 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
 
 ### Smoke tests（已内置）
 
-仓库内置了 4 类 smoke tests + 1 个总入口：
+仓库内置了 5 类 smoke tests + 1 个总入口：
 
 - `scripts/smoke/01-cursor-init-outputs.sh`
   - 断言 `bin/cursor-init` 在 `backend/frontend/spec_center` 三种 mode 下都能产出预期文件
@@ -370,6 +387,8 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
   - 检查关键模板是否存在、PR 字段是否完整、commands 与 PR 模板字段是否对齐
 - `scripts/smoke/04-cursor-bootstrap.sh`
   - 检查 `bin/cursor-bootstrap` 的 merge/overwrite 与 spec_center 丰满参数行为
+- `scripts/smoke/05-cursor-cleanup.sh`
+  - 检查 `bin/cursor-cleanup` 的 dry-run 与 apply 删除行为
 - `scripts/smoke/run-all.sh`
   - 一键运行全部 smoke tests
 
@@ -410,6 +429,7 @@ make smoke-init
 make smoke-gates
 make smoke-templates
 make smoke-bootstrap
+make smoke-cleanup
 ```
 
 CI 自动执行：
