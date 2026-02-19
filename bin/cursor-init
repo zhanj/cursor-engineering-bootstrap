@@ -352,7 +352,7 @@ run_spec_kit_init() {
   if [[ "${OVERWRITE}" != "1" ]]; then
     local tmpdir
     tmpdir="$(mktemp -d)"
-    local temp_init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--force" "--no-git")
+    local temp_init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--force" "--no-git" "--ignore-agent-tools")
     SPEC_KIT_INIT_CMD="${temp_init_cmd[*]} (temp bootstrap + non-overwrite merge)"
     if [[ "${SPEC_KIT_EXISTING_ASSETS}" == "none" ]]; then
       echo "Running non-overwrite bootstrap from temp directory."
@@ -362,7 +362,7 @@ run_spec_kit_init() {
       echo "[spec-kit] existing_assets=${SPEC_KIT_EXISTING_ASSETS}" >> "${SPEC_KIT_INIT_LOG}"
     fi
     echo "[spec-kit] run temp bootstrap: ${temp_init_cmd[*]}" >> "${SPEC_KIT_INIT_LOG}"
-    if (cd "${tmpdir}" && "${temp_init_cmd[@]}") >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
+    if (cd "${tmpdir}" && "${temp_init_cmd[@]}") >>"${SPEC_KIT_INIT_LOG}" 2>&1 < /dev/null; then
       if command -v rsync >/dev/null 2>&1; then
         rsync -a --ignore-existing "${tmpdir}/" "${PROJECT_DIR}/" >>"${SPEC_KIT_INIT_LOG}" 2>&1
       else
@@ -398,7 +398,7 @@ run_spec_kit_init() {
     fi
   fi
 
-  local init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}")
+  local init_cmd=("specify" "init" "." "--ai" "${SPEC_KIT_AI}" "--ignore-agent-tools")
   if [[ "${OVERWRITE}" == "1" ]]; then
     init_cmd+=("--force")
   fi
@@ -429,7 +429,7 @@ run_spec_kit_init() {
 
   echo "Running spec-kit init: ${SPEC_KIT_INIT_CMD}"
   echo "[spec-kit] run direct init: ${SPEC_KIT_INIT_CMD}" >> "${SPEC_KIT_INIT_LOG}"
-  if "${init_cmd[@]}" >>"${SPEC_KIT_INIT_LOG}" 2>&1; then
+  if "${init_cmd[@]}" >>"${SPEC_KIT_INIT_LOG}" 2>&1 < /dev/null; then
     if [[ -d ".specify" ]]; then
       SPEC_KIT_INIT_RESULT="ok"
       SPEC_KIT_HINT="spec-kit init executed successfully."
