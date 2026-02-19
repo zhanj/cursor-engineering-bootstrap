@@ -14,7 +14,8 @@
 3. 校准规则中的目录落点（views/components/api/router/store）。
 4. 检查 API 调用风格是否统一（request 封装、错误处理、鉴权头）。
 5. 检查 `spec_center/capability-registry.md` 与 `<service>/contracts/openapi.yaml` 是否可访问；缺失时明确标注“待建”并给出创建建议。
-6. 输出落库清单与风险点。
+6. 检查 `.specify/memory/constitution.md` 是否存在；若缺失，先按 `docs/speckit-constitution-prompt.md` 执行 `/speckit.constitution`，并确认文件已生成后再继续。
+7. 输出落库清单与风险点。
 
 ## 输出格式（必须）
 - `校准结论`
@@ -22,3 +23,4 @@
 - `待人工确认`
 - `验证命令`
 - `Spec 资产状态`（`capability-registry/openapi` 的存在性与“待建”项）
+- `Constitution 状态`（`.specify/memory/constitution.md` 的存在性与处理结果：已存在/已补建/待人工处理）

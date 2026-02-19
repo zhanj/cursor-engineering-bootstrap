@@ -12,16 +12,17 @@
 
 ## 执行步骤（必须按顺序）
 1. 先校验输入产物是否齐全（spec/plan/tasks）；若任一缺失，停止执行并输出缺失项清单。
-2. 读取 spec/plan/tasks，提炼：
+2. 检查 `.specify/memory/constitution.md` 是否存在；若缺失，停止执行并返回 `/init-scan` 阶段先补建 constitution（参考 `docs/speckit-constitution-prompt.md`）。
+3. 读取 spec/plan/tasks，提炼：
    - 业务目标与边界
    - 页面/API/路由/权限影响
    - 验证与回滚要求
-3. 执行 `/api-search`，产出可直接粘贴 PR `1) 复用依据` 的内容。
-4. 执行 `/implement-task`，完成最小闭环实现（views/components/api/router/store）。
-5. 若涉及契约变化，同步更新 `openapi.yaml` 并说明兼容性。
-6. 若新增/调整接口，同步更新 `spec_center/capability-registry.md`；若仓库未接入 Spec Center，在 PR 中标注“待建”并给出补建计划。
-7. 生成 PR 草稿（严格按仓库根 `PR_TEMPLATE.md` 字段逐条填写，不得省略子项）。
-8. 执行项目标准校验命令（优先 `make ci`；若项目约定为 `mvn verify`、`pnpm test` 或其他命令，按项目 README 执行），记录结果并更新到 PR `4) 验证证据`。
+4. 执行 `/api-search`，产出可直接粘贴 PR `1) 复用依据` 的内容。
+5. 执行 `/implement-task`，完成最小闭环实现（views/components/api/router/store）。
+6. 若涉及契约变化，同步更新 `openapi.yaml` 并说明兼容性。
+7. 若新增/调整接口，同步更新 `spec_center/capability-registry.md`；若仓库未接入 Spec Center，在 PR 中标注“待建”并给出补建计划。
+8. 生成 PR 草稿（严格按仓库根 `PR_TEMPLATE.md` 字段逐条填写，不得省略子项）。
+9. 执行项目标准校验命令（优先 `make ci`；若项目约定为 `mvn verify`、`pnpm test` 或其他命令，按项目 README 执行），记录结果并更新到 PR `4) 验证证据`。
 
 ## 输出格式（必须）
 - `1) 复用依据（必填）`（来自 `/api-search`）
@@ -33,6 +34,7 @@
 
 ## 失败处理（必须）
 - 若 spec/plan/tasks 任一缺失：停止执行，输出缺失项与补齐建议，不进入实现阶段。
+- 若 `.specify/memory/constitution.md` 缺失：停止执行并返回 `/init-scan` 先补建。
 - 若标准校验命令失败：先修复再更新 PR 草稿，不允许跳过 gates。
 - 若契约影响不明确：默认按“有变更”处理并补充 `openapi.yaml` 或给出“无变更”依据。
 

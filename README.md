@@ -203,6 +203,7 @@ spec-kit 集成参数：
 ### `bundle` 会产出什么
 
 - `_cursor_init/patch_bundle/<mode>/`：对应模板快照，供 PR 落库使用
+- 默认额外包含：`_cursor_init/patch_bundle/<mode>/docs/speckit-constitution-prompt.md`（统一 constitution 提示词）
 - 默认额外包含：`_cursor_init/patch_bundle/<mode>/docs/cursor-bootstrap-readme.md`（用于目标仓 Cursor 检索）
 
 其中：
@@ -371,6 +372,9 @@ CI 自动执行：
 - 不维护双套交付标准（统一以 `PR_TEMPLATE + make ci` 为准）
 - 不绕过 gates（契约/DB 一致性仍强制检查）
 - 不重度 fork spec-kit（优先适配层集成）
+
+建议在 spec-kit 初始化后第一步执行 `/speckit.constitution`。  
+统一提示词见：`docs/speckit-constitution-prompt.md`（单一维护，避免多处漂移）。
 
 ### spec-kit 桥接命令与场景
 

@@ -183,6 +183,7 @@ PLAN="${OUT_DIR}/apply_plan.md"
 HOOKS_SUGGESTED="${OUT_DIR}/hooks.suggested.json"
 BOOTSTRAP_README_OUT="${OUT_DIR}/cursor-bootstrap-readme.md"
 SPEC_KIT_INIT_LOG="${OUT_DIR}/specify-init.log"
+SPECKIT_CONSTITUTION_PROMPT_SRC="${ROOT_DIR}/docs/speckit-constitution-prompt.md"
 
 SEARCH_EXCLUDES=(
   ".git"
@@ -566,6 +567,10 @@ bundle_templates() {
     exit 1
   fi
   cp -R "${src}/." "${dst}/"
+  if [[ -f "${SPECKIT_CONSTITUTION_PROMPT_SRC}" ]]; then
+    mkdir -p "${dst}/docs"
+    cp "${SPECKIT_CONSTITUTION_PROMPT_SRC}" "${dst}/docs/speckit-constitution-prompt.md"
+  fi
   if [[ "${INCLUDE_BOOTSTRAP_README}" == "1" ]]; then
     mkdir -p "${dst}/docs"
     cp "${BOOTSTRAP_README_OUT}" "${dst}/docs/cursor-bootstrap-readme.md"

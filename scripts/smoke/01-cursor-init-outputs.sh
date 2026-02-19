@@ -68,6 +68,7 @@ run_mode() {
   )
 
   assert_dir "${workdir}/_cursor_init/patch_bundle/${mode}"
+  assert_file "${workdir}/_cursor_init/patch_bundle/${mode}/docs/speckit-constitution-prompt.md"
   assert_file "${workdir}/_cursor_init/patch_bundle/${mode}/docs/cursor-bootstrap-readme.md"
 }
 
