@@ -1,0 +1,499 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CURSOR_INIT="${ROOT_DIR}/bin/cursor-init"
+
+usage() {
+  echo "Usage:"
+  echo "  bash bin/cursor-bootstrap --target-dir <path> [options]"
+  echo "  bash bin/cursor-bootstrap --use-current-dir [options]"
+  echo
+  echo "Options:"
+  echo "  --mode backend                Bootstrap mode (minimal version supports backend only)"
+  echo "  --target-dir <path>           Target project root (required unless --use-current-dir)"
+  echo "  --use-current-dir             Use current directory as target project root"
+  echo "  --with-spec-kit               Enable spec-kit checks"
+  echo "  --spec-kit-ai <agent>         spec-kit AI agent (default: cursor-agent)"
+  echo "  --execute-spec-kit            Execute spec-kit init during dry-run stage"
+  echo "  --spec-kit-yes                Confirm spec-kit execution (required with --execute-spec-kit)"
+  echo "  --overwrite                   Allow overwrite for spec-kit init and apply-mode overwrite"
+  echo "  --init-scan-overwrite <on|off>  Overwrite policy used by init-scan mirror semantics"
+  echo "  --enrich-spec-center          Fill minimal spec_center skeleton (safe, non-destructive by default)"
+  echo "  --no-bootstrap-readme         Do not include bootstrap README snapshot"
+  echo "  --plan-only                   Generate reports/bundle only, no root .cursor apply"
+  echo "  --apply-to-root-cursor        Apply .cursor assets into target root .cursor"
+  echo "  --apply-mode <mode>           merge|overwrite|report-only (default: merge)"
+}
+
+MODE="backend"
+TARGET_DIR=""
+USE_CURRENT_DIR=0
+WITH_SPEC_KIT=0
+SPEC_KIT_AI="cursor-agent"
+EXECUTE_SPEC_KIT=0
+SPEC_KIT_YES=0
+OVERWRITE=0
+INCLUDE_BOOTSTRAP_README=1
+PLAN_ONLY=0
+APPLY_TO_ROOT_CURSOR=0
+APPLY_MODE="merge"
+INIT_SCAN_OVERWRITE=""
+ENRICH_SPEC_CENTER=0
+declare -a target_args
+declare -a common_args
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --target-dir)
+      TARGET_DIR="${2:-}"
+      shift 2
+      ;;
+    --use-current-dir)
+      USE_CURRENT_DIR=1
+      shift
+      ;;
+    --with-spec-kit)
+      WITH_SPEC_KIT=1
+      shift
+      ;;
+    --spec-kit-ai)
+      SPEC_KIT_AI="${2:-}"
+      shift 2
+      ;;
+    --execute-spec-kit)
+      EXECUTE_SPEC_KIT=1
+      shift
+      ;;
+    --spec-kit-yes)
+      SPEC_KIT_YES=1
+      shift
+      ;;
+    --overwrite)
+      OVERWRITE=1
+      shift
+      ;;
+    --init-scan-overwrite)
+      INIT_SCAN_OVERWRITE="${2:-}"
+      shift 2
+      ;;
+    --enrich-spec-center)
+      ENRICH_SPEC_CENTER=1
+      shift
+      ;;
+    --no-bootstrap-readme)
+      INCLUDE_BOOTSTRAP_README=0
+      shift
+      ;;
+    --plan-only)
+      PLAN_ONLY=1
+      shift
+      ;;
+    --apply-to-root-cursor)
+      APPLY_TO_ROOT_CURSOR=1
+      shift
+      ;;
+    --apply-mode)
+      APPLY_MODE="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "${MODE}" != "backend" ]]; then
+  echo "Minimal cursor-bootstrap currently supports only --mode backend."
+  exit 1
+fi
+
+if [[ -n "${TARGET_DIR}" && "${USE_CURRENT_DIR}" == "1" ]]; then
+  echo "Use either --target-dir or --use-current-dir, not both."
+  exit 1
+fi
+
+if [[ -z "${TARGET_DIR}" && "${USE_CURRENT_DIR}" != "1" ]]; then
+  echo "Missing target directory. Use --target-dir <path> or --use-current-dir."
+  exit 1
+fi
+
+if [[ "${USE_CURRENT_DIR}" == "1" ]]; then
+  TARGET_DIR="."
+fi
+
+if [[ ! -d "${TARGET_DIR}" ]]; then
+  echo "Target directory does not exist: ${TARGET_DIR}"
+  exit 1
+fi
+
+case "${APPLY_MODE}" in
+  merge|overwrite|report-only) ;;
+  *)
+    echo "Invalid --apply-mode: ${APPLY_MODE} (expected merge|overwrite|report-only)"
+    exit 1
+    ;;
+esac
+
+if [[ -n "${INIT_SCAN_OVERWRITE}" ]]; then
+  case "${INIT_SCAN_OVERWRITE}" in
+    on|off) ;;
+    *)
+      echo "Invalid --init-scan-overwrite: ${INIT_SCAN_OVERWRITE} (expected on|off)"
+      exit 1
+      ;;
+  esac
+else
+  if [[ "${OVERWRITE}" == "1" ]]; then
+    INIT_SCAN_OVERWRITE="on"
+  else
+    INIT_SCAN_OVERWRITE="off"
+  fi
+fi
+
+if [[ "${PLAN_ONLY}" == "1" ]]; then
+  APPLY_TO_ROOT_CURSOR=0
+fi
+
+if [[ "${APPLY_MODE}" == "overwrite" && "${OVERWRITE}" != "1" ]]; then
+  echo "--apply-mode overwrite requires --overwrite for safety."
+  exit 1
+fi
+
+if [[ ! -f "${CURSOR_INIT}" ]]; then
+  echo "Missing dependency: ${CURSOR_INIT}"
+  exit 1
+fi
+
+PROJECT_DIR="$(cd "${TARGET_DIR}" && pwd)"
+OUT_DIR="${PROJECT_DIR}/_cursor_init"
+mkdir -p "${OUT_DIR}"
+BOOTSTRAP_REPORT="${OUT_DIR}/bootstrap-report.md"
+INIT_SCAN_MIRROR_REPORT="${OUT_DIR}/init-scan-mirror.md"
+
+build_target_args() {
+  target_args=()
+  if [[ "${USE_CURRENT_DIR}" == "1" ]]; then
+    target_args=(--use-current-dir)
+  else
+    target_args=(--target-dir "${PROJECT_DIR}")
+  fi
+}
+
+build_common_args() {
+  common_args=()
+  if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
+    common_args+=(--with-spec-kit --spec-kit-ai "${SPEC_KIT_AI}")
+    if [[ "${EXECUTE_SPEC_KIT}" == "1" ]]; then
+      common_args+=(--execute-spec-kit)
+      if [[ "${SPEC_KIT_YES}" == "1" ]]; then
+        common_args+=(--spec-kit-yes)
+      fi
+    fi
+    if [[ "${OVERWRITE}" == "1" ]]; then
+      common_args+=(--overwrite)
+    fi
+  fi
+  if [[ "${INCLUDE_BOOTSTRAP_README}" != "1" ]]; then
+    common_args+=(--no-bootstrap-readme)
+  fi
+}
+
+detect_service_name() {
+  local base
+  base="$(basename "${PROJECT_DIR}")"
+  base="$(printf "%s" "${base}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
+  base="${base##-}"
+  base="${base%%-}"
+  if [[ -z "${base}" ]]; then
+    base="service"
+  fi
+  printf "%s" "${base}"
+}
+
+apply_root_cursor_assets() {
+  local bundle_dir="${PROJECT_DIR}/_cursor_init/patch_bundle/${MODE}"
+  local src_cursor="${bundle_dir}/.cursor/"
+  local dst_cursor="${PROJECT_DIR}/.cursor/"
+
+  if [[ ! -d "${src_cursor}" ]]; then
+    echo "apply skipped: source .cursor not found in bundle (${src_cursor})"
+    return 0
+  fi
+
+  mkdir -p "${PROJECT_DIR}/.cursor"
+  case "${APPLY_MODE}" in
+    merge)
+      rsync -a --ignore-existing "${src_cursor}" "${dst_cursor}"
+      ;;
+    overwrite)
+      rsync -a "${src_cursor}" "${dst_cursor}"
+      ;;
+    report-only)
+      rsync -ani "${src_cursor}" "${dst_cursor}" > "${OUT_DIR}/apply-root-cursor.preview.txt"
+      ;;
+  esac
+}
+
+enrich_spec_center_assets() {
+  local service_name
+  service_name="$(detect_service_name)"
+  local spec_center_dir="${PROJECT_DIR}/spec_center"
+  local capability_file="${spec_center_dir}/capability-registry.md"
+  local openapi_file="${spec_center_dir}/${service_name}/contracts/openapi.yaml"
+  local raw_contracts_readme="${spec_center_dir}/_raw_contracts/README.md"
+  local enrich_action="skipped"
+
+  mkdir -p "${spec_center_dir}/${service_name}/contracts" "${spec_center_dir}/_raw_contracts"
+
+  if [[ "${INIT_SCAN_OVERWRITE}" == "on" ]]; then
+    cat > "${capability_file}" <<'EOF'
+# capability-registry
+
+> Auto-generated minimal skeleton by cursor-bootstrap --enrich-spec-center.
+> Refine entries with /api-search and /bridge-implement outputs.
+
+## Capabilities
+- TODO: add at least 3 reusable capability entries
+EOF
+
+    cat > "${openapi_file}" <<EOF
+openapi: 3.0.0
+info:
+  title: ${service_name}
+  version: 0.0.1
+paths: {}
+EOF
+    cat > "${raw_contracts_readme}" <<'EOF'
+# _raw_contracts
+
+此目录用于存放第三方或网关导出的原始契约文件（如 Apifox/OpenAPI 导出）。
+
+- 当前状态：待导入原始契约
+- 约束：原始文件建议只读，不在此目录手工维护业务语义
+- 建议：以 `spec_center/<service>/contracts/openapi.yaml` 作为治理契约入口
+EOF
+    enrich_action="overwritten"
+  else
+    if [[ ! -f "${capability_file}" ]]; then
+      cat > "${capability_file}" <<'EOF'
+# capability-registry
+
+> Auto-generated minimal skeleton by cursor-bootstrap --enrich-spec-center.
+> Refine entries with /api-search and /bridge-implement outputs.
+
+## Capabilities
+- TODO: add at least 3 reusable capability entries
+EOF
+      enrich_action="created"
+    fi
+
+    if [[ ! -f "${openapi_file}" ]]; then
+      cat > "${openapi_file}" <<EOF
+openapi: 3.0.0
+info:
+  title: ${service_name}
+  version: 0.0.1
+paths: {}
+EOF
+      if [[ "${enrich_action}" == "skipped" ]]; then
+        enrich_action="created"
+      fi
+    fi
+
+    if [[ ! -f "${raw_contracts_readme}" ]]; then
+      cat > "${raw_contracts_readme}" <<'EOF'
+# _raw_contracts
+
+此目录用于存放第三方或网关导出的原始契约文件（如 Apifox/OpenAPI 导出）。
+
+- 当前状态：待导入原始契约
+- 约束：原始文件建议只读，不在此目录手工维护业务语义
+- 建议：以 `spec_center/<service>/contracts/openapi.yaml` 作为治理契约入口
+EOF
+      if [[ "${enrich_action}" == "skipped" ]]; then
+        enrich_action="created"
+      fi
+    fi
+  fi
+
+  echo "${enrich_action}" > "${OUT_DIR}/spec-center-enrich.action"
+}
+
+build_init_scan_mirror() {
+  local rules_status="missing"
+  local rules_action="created"
+  local commands_status="missing"
+  local template_alignment="fail"
+  local commands_action="created"
+  local hooks_status="missing"
+  local hooks_cmd_check="fail(missing hooks.json)"
+  local hooks_action="created"
+
+  local capability_state="missing"
+  local openapi_state="missing"
+  local constitution_state="missing"
+
+  local overlay_action="skipped"
+  local enrich_action="not_requested"
+  local spec_policy_action="skipped"
+  if [[ "${PLAN_ONLY}" == "1" ]]; then
+    overlay_action="report_only"
+  elif [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]]; then
+    if [[ "${APPLY_MODE}" == "overwrite" ]]; then
+      overlay_action="overwritten"
+    elif [[ "${APPLY_MODE}" == "merge" ]]; then
+      overlay_action="created+skipped"
+    else
+      overlay_action="report_only"
+    fi
+  fi
+
+  if [[ "${ENRICH_SPEC_CENTER}" == "1" ]]; then
+    if [[ -f "${OUT_DIR}/spec-center-enrich.action" ]]; then
+      enrich_action="$(<"${OUT_DIR}/spec-center-enrich.action")"
+    else
+      enrich_action="failed"
+    fi
+  fi
+
+  if compgen -G "${PROJECT_DIR}/.cursor/rules/*.mdc" >/dev/null 2>&1; then
+    rules_status="ok"
+    if [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]]; then
+      rules_action="${overlay_action}"
+    else
+      rules_action="skipped"
+    fi
+  fi
+
+  if [[ -f "${PROJECT_DIR}/.cursor/commands/api-search.md" ]] && [[ -f "${PROJECT_DIR}/.cursor/commands/implement-task.md" ]] && [[ -f "${PROJECT_DIR}/.cursor/commands/init-scan.md" ]] && [[ -f "${PROJECT_DIR}/.cursor/commands/bridge-implement.md" ]]; then
+    commands_status="ok"
+    template_alignment="pass"
+    if [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]]; then
+      commands_action="${overlay_action}"
+    else
+      commands_action="skipped"
+    fi
+  fi
+
+  if [[ -f "${PROJECT_DIR}/.cursor/hooks/hooks.json" ]] && [[ -f "${PROJECT_DIR}/.cursor/hooks/gates/config.sh" ]]; then
+    hooks_status="ok"
+    hooks_cmd_check="pass"
+    if [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]]; then
+      hooks_action="${overlay_action}"
+    else
+      hooks_action="skipped"
+    fi
+  fi
+
+  if [[ -f "${PROJECT_DIR}/spec_center/capability-registry.md" ]]; then
+    capability_state="exists"
+  fi
+
+  shopt -s nullglob
+  local openapi_matches=("${PROJECT_DIR}"/spec_center/*/contracts/openapi.yaml)
+  if [[ ${#openapi_matches[@]} -gt 0 ]]; then
+    openapi_state="exists"
+  fi
+  shopt -u nullglob
+
+  if [[ -f "${PROJECT_DIR}/.specify/memory/constitution.md" ]]; then
+    constitution_state="exists"
+  fi
+
+  if [[ "${INIT_SCAN_OVERWRITE}" == "on" ]]; then
+    spec_policy_action="overwritten"
+  else
+    if [[ "${capability_state}" == "missing" || "${openapi_state}" == "missing" || "${constitution_state}" == "missing" ]]; then
+      spec_policy_action="created"
+    else
+      spec_policy_action="skipped"
+    fi
+  fi
+
+  cat > "${INIT_SCAN_MIRROR_REPORT}" <<EOF
+# init-scan mirror report
+
+- Rules 状态：rules_status=${rules_status}，rules_action=${rules_action}
+- Commands 状态：commands_status=${commands_status}，template_alignment=${template_alignment}，commands_action=${commands_action}
+- Hooks 状态：hooks_status=${hooks_status}，hooks_cmd_check=${hooks_cmd_check}，hooks_action=${hooks_action}
+- Spec 资产状态：capability-registry=${capability_state}，openapi=${openapi_state}，action=${spec_policy_action}
+- Constitution 状态：constitution=${constitution_state}
+- 覆盖开关状态：overwrite=$( [[ "${OVERWRITE}" == "1" ]] && echo on || echo off )，init_scan_overwrite=${INIT_SCAN_OVERWRITE}，action_summary=${overlay_action}
+- Spec Center 丰满：enrich_spec_center=$( [[ "${ENRICH_SPEC_CENTER}" == "1" ]] && echo on || echo off )，action=${enrich_action}
+EOF
+}
+
+build_target_args
+build_common_args
+
+dry_run_cmd=("bash" "${CURSOR_INIT}" "dry-run" "--mode" "${MODE}" "${target_args[@]}")
+bundle_cmd=("bash" "${CURSOR_INIT}" "bundle" "--mode" "${MODE}" "${target_args[@]}")
+if [[ ${#common_args[@]} -gt 0 ]]; then
+  dry_run_cmd+=("${common_args[@]}")
+  bundle_cmd+=("${common_args[@]}")
+fi
+
+echo "[cursor-bootstrap] step 1/4: dry-run (${MODE})"
+"${dry_run_cmd[@]}"
+
+echo "[cursor-bootstrap] step 2/4: bundle (${MODE})"
+"${bundle_cmd[@]}"
+
+if [[ "${APPLY_TO_ROOT_CURSOR}" == "1" && "${PLAN_ONLY}" != "1" ]]; then
+  echo "[cursor-bootstrap] step 3/4: apply root .cursor (mode=${APPLY_MODE})"
+  apply_root_cursor_assets
+else
+  echo "[cursor-bootstrap] step 3/4: root .cursor apply skipped"
+fi
+
+if [[ "${ENRICH_SPEC_CENTER}" == "1" && "${PLAN_ONLY}" != "1" ]]; then
+  echo "[cursor-bootstrap] step 4/5: enrich spec_center (minimal safe mode)"
+  enrich_spec_center_assets
+else
+  echo "[cursor-bootstrap] step 4/5: spec_center enrich skipped"
+fi
+
+echo "[cursor-bootstrap] step 5/5: write bootstrap reports"
+build_init_scan_mirror
+
+cat > "${BOOTSTRAP_REPORT}" <<EOF
+# cursor-bootstrap report (minimal/backend)
+
+## Input
+- mode=${MODE}
+- project_dir=${PROJECT_DIR}
+- with_spec_kit=${WITH_SPEC_KIT}
+- execute_spec_kit=${EXECUTE_SPEC_KIT}
+- spec_kit_ai=${SPEC_KIT_AI}
+- overwrite=$( [[ "${OVERWRITE}" == "1" ]] && echo on || echo off )
+- init_scan_overwrite=${INIT_SCAN_OVERWRITE}
+- enrich_spec_center=$( [[ "${ENRICH_SPEC_CENTER}" == "1" ]] && echo on || echo off )
+- plan_only=$( [[ "${PLAN_ONLY}" == "1" ]] && echo yes || echo no )
+- apply_to_root_cursor=$( [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]] && echo yes || echo no )
+- apply_mode=${APPLY_MODE}
+
+## Outputs
+- dry-run report: ${OUT_DIR}/report.md
+- patch bundle: ${OUT_DIR}/patch_bundle/${MODE}/
+- init-scan mirror: ${INIT_SCAN_MIRROR_REPORT}
+- spec-kit log: ${OUT_DIR}/specify-init.log (when --with-spec-kit)
+
+## Next
+- Review ${OUT_DIR}/patch_bundle/${MODE}/ and ${INIT_SCAN_MIRROR_REPORT}
+- For AI workflow, run /init-scan in Cursor to calibrate project-specific details
+EOF
+
+echo "[cursor-bootstrap] done"
+echo "- bootstrap report: ${BOOTSTRAP_REPORT}"
+echo "- init-scan mirror: ${INIT_SCAN_MIRROR_REPORT}"

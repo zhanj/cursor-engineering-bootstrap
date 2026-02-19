@@ -235,6 +235,42 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 
 ---
 
+## 一键编排（bin/cursor-bootstrap，backend 最小版）
+
+用于把初始化动作串起来执行：`dry-run -> bundle -> (可选)spec-kit init -> (可选)写入目标仓根目录 .cursor -> (可选)spec_center 最小丰满 -> init-scan 镜像报告`。
+
+### 语法
+
+```bash
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode overwrite --overwrite
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --init-scan-overwrite on
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --enrich-spec-center
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
+```
+
+### 关键开关
+
+- `--apply-to-root-cursor`：把模板中的 `.cursor` 资产直接写入目标仓根 `.cursor/`
+- `--apply-mode merge|overwrite|report-only`：
+  - `merge`（默认）：只补缺，不覆盖已有文件
+  - `overwrite`：覆盖目标文件（需显式 `--overwrite`）
+  - `report-only`：仅产出预览，不写入
+- `--init-scan-overwrite on|off`：单独控制 init-scan 镜像策略语义（与全局 `--overwrite` 解耦）
+- `--enrich-spec-center`：补齐最小 spec_center 骨架（默认不改已有文件；`--init-scan-overwrite on` 时允许覆盖占位）
+  - 默认补齐：
+    - `spec_center/capability-registry.md`
+    - `spec_center/<service>/contracts/openapi.yaml`
+    - `spec_center/_raw_contracts/README.md`（标注“待导入原始契约”）
+- `--plan-only`：只生成报告与 bundle，不执行根目录写入
+
+### 产物
+
+- `_cursor_init/bootstrap-report.md`：一键编排执行摘要
+- `_cursor_init/init-scan-mirror.md`：镜像版 init-scan 状态输出（rules/commands/hooks/spec/constitution）
+
 ## 推荐落地顺序（团队视角）
 
 1. 先落地 Spec Center（契约与能力索引中心）
