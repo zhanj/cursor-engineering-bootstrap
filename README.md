@@ -8,6 +8,7 @@
 - `Backend 模板`：`rules + commands + hooks + PR_TEMPLATE`
 - `Frontend 模板`：`rules + commands + hooks + PR_TEMPLATE`
 - `init-runner`：通过 `dry-run` 和 `bundle` 生成可审查的落库方案
+- `bootstrap-runner`：`bin/cursor-bootstrap` 一键编排（backend 最小版）
 
 一句话：先规范“怎么做”，再规范“怎么提交证明做对了”。
 
@@ -44,6 +45,14 @@ bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode backend 
 ```
 
 将 `_cursor_init/patch_bundle/backend/` 通过 PR 方式落库。
+
+也可以使用一键编排（backend 最小版）：
+
+```bash
+bash path/to/cursor-engineering-bootstrap/bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
+```
+
+说明：默认“补缺不覆盖”；详细参数见下方“`bin/cursor-bootstrap`”章节。
 
 ### 3) 初始化前端仓库
 
@@ -351,7 +360,7 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
 
 ### Smoke tests（已内置）
 
-仓库内置了 3 类 smoke tests + 1 个总入口：
+仓库内置了 4 类 smoke tests + 1 个总入口：
 
 - `scripts/smoke/01-cursor-init-outputs.sh`
   - 断言 `bin/cursor-init` 在 `backend/frontend/spec_center` 三种 mode 下都能产出预期文件
@@ -359,6 +368,8 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
   - 在临时 git 仓库模拟典型 diff，断言 contract/db gates 在 `block/warn` 模式下退出码符合预期
 - `scripts/smoke/03-template-integrity.sh`
   - 检查关键模板是否存在、PR 字段是否完整、commands 与 PR 模板字段是否对齐
+- `scripts/smoke/04-cursor-bootstrap.sh`
+  - 检查 `bin/cursor-bootstrap` 的 merge/overwrite 与 spec_center 丰满参数行为
 - `scripts/smoke/run-all.sh`
   - 一键运行全部 smoke tests
 
@@ -398,6 +409,7 @@ make ci-full
 make smoke-init
 make smoke-gates
 make smoke-templates
+make smoke-bootstrap
 ```
 
 CI 自动执行：
