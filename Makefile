@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help ci ci-quick ci-full smoke smoke-init smoke-gates smoke-templates e2e e2e-dev-path
+.PHONY: help ci ci-quick ci-full smoke smoke-init smoke-gates smoke-templates e2e e2e-dev-path e2e-frontend-dev-path e2e-init-scan
 
 help:
 	@echo "Available targets:"
@@ -13,6 +13,8 @@ help:
 	@echo "  make smoke-templates Run template integrity smoke"
 	@echo "  make e2e             Run all end-to-end drills"
 	@echo "  make e2e-dev-path    Run backend dev-path E2E drill"
+	@echo "  make e2e-frontend-dev-path Run frontend dev-path E2E drill"
+	@echo "  make e2e-init-scan   Run init-scan mirror E2E drill"
 
 ci: smoke
 
@@ -37,3 +39,9 @@ e2e:
 
 e2e-dev-path:
 	@bash scripts/e2e/01-dev-path-flow.sh
+
+e2e-frontend-dev-path:
+	@bash scripts/e2e/02-frontend-dev-path-flow.sh
+
+e2e-init-scan:
+	@bash scripts/e2e/03-init-scan-flow.sh

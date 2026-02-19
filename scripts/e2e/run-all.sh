@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 declare -a STEPS=(
   "01-dev-path-flow.sh|backend dev-path flow"
+  "02-frontend-dev-path-flow.sh|frontend dev-path flow"
+  "03-init-scan-flow.sh|init-scan mirror flow"
 )
 
 echo "[e2e] start"

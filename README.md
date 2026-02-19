@@ -339,14 +339,18 @@ make ci-full
 
 ```bash
 make e2e
-# 或仅执行开发路径演练
+# 或仅执行某一条开发路径演练
 make e2e-dev-path
+make e2e-frontend-dev-path
+make e2e-init-scan
 ```
 
 说明：
 
-- E2E 脚本会在临时目录创建一个 backend 样例项目并自动清理。
+- E2E 脚本会在临时目录创建 backend/frontend 样例项目并自动清理。
 - 默认会执行 `specify init`（需本机已安装 `specify`）。
+- `make e2e` 会顺序执行 backend + frontend 两套演练。
+- `make e2e-init-scan` 会执行 `init-scan` 专项镜像检查（状态词与 overwrite 决策矩阵）。
 - 如需保留临时目录排查，可设置：`E2E_KEEP_WORKDIR=1 make e2e-dev-path`。
 
 或使用 Makefile（推荐）：
