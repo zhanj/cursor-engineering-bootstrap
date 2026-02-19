@@ -240,7 +240,24 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 1. 先落地 Spec Center（契约与能力索引中心）
 2. 再落地 Backend 模板
 3. 最后落地 Frontend 模板
-4. 统一培训一次 `/api-search -> /implement-task -> PR_TEMPLATE` 流程
+4. 统一培训一次“spec-kit 优先 + bridge 执行链路”流程
+
+### 存量项目最短路径（spec-kit 优先）
+
+推荐默认流程（需求开发）：
+
+1. `dry-run -> bundle -> PR 落库`
+2. 在项目里执行 `/init-scan` 完成校准
+3. 若缺 `.specify/memory/constitution.md`，先执行 `/speckit.constitution`（提示词见 `docs/speckit-constitution-prompt.md`）
+4. 执行 `/speckit.specify -> /speckit.plan -> /speckit.tasks`
+5. 执行 `/bridge-implement`
+6. 执行项目标准校验命令（优先 `make ci`，否则按 README）
+7. 按 `PR_TEMPLATE.md` 提交 PR
+
+小改动快速路径（可选）：
+
+- 仅在“需求清晰、低风险、无需完整 spec-kit 拆解”时使用：
+  - `/api-search -> /implement-task -> 项目标准校验命令 -> PR_TEMPLATE`
 
 ---
 
@@ -248,12 +265,14 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 
 ### 开发前
 
-- 先执行 `/api-search`
-- 从 `capability-registry + openapi + 代码现状` 找可复用能力
+- 默认先走 spec-kit 流程：`/speckit.specify -> /speckit.plan -> /speckit.tasks`
+- 确保 `.specify/memory/constitution.md` 已存在（缺失先补建）
+- 低风险小改动可走快速路径：先执行 `/api-search`
 
 ### 开发中
 
-- 用 `/implement-task` 做最小闭环实现
+- spec-kit 优先：用 `/bridge-implement` 对齐到工程执行链路
+- 快速路径：用 `/implement-task` 做最小闭环实现
 - 遵守 `rules/*.mdc` 的边界约束
 
 ### 提交前
@@ -263,8 +282,8 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 
 ### PR 填写建议（v2.1.3+ 已对齐）
 
-- `/api-search` 输出可直接贴 `PR_TEMPLATE` 的 `1) 复用依据`
-- `/implement-task` 输出可直接贴 `2)~5)`
+- spec-kit 优先时：`/bridge-implement` 输出按字段直接填 `PR_TEMPLATE` `1)~6)`
+- 快速路径时：`/api-search` 输出贴 `1)`，`/implement-task` 输出贴 `2)~5)`
 - `/be-debug` / `/fe-debug` 输出可直接补充 `4)~5)`
 
 ### Gate 与 GitHub Actions 的关系（避免混淆）
