@@ -10,7 +10,20 @@
   - 持久层变更但未见迁移证据 → 告警/可阻断
   - 升级：CURSOR_DB_GATE_MODE=block
 
+- `pr-dev-path-check.sh`：PR 开发路径门禁（默认告警，建议在 CI 调用）
+  - 阶段 1（默认）：检查 PR 是否“二选一”勾选 `主流程 / 快速路径`
+  - 阶段 2（预留）：在阶段 1 基础上校验对应证据（主流程需要 spec-kit/bridge 证据；快速路径需要 `/api-search` + `/implement-task` 证据）
+  - 升级方式：
+    - `CURSOR_DEV_PATH_GATE_MODE=block`
+    - `CURSOR_DEV_PATH_GATE_STAGE=2`
+
 > 脚本基于 git staged diff，不同项目目录/命名请按需调整正则。
+
+CI 示例（读取 PR body 文件）：
+
+```bash
+bash .cursor/hooks/gates/pr-dev-path-check.sh .cursor/pr-body.md
+```
 
 ## v2.2 更新
 - 新增 `config.sh`：把可调参数集中到一个地方（团队只改一处）

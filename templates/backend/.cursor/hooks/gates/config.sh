@@ -14,6 +14,8 @@ set -euo pipefail
 # ------------------------
 # warn: 默认告警（便于增量落地）；block: 阻断
 export CURSOR_CONTRACT_GATE_MODE="${CURSOR_CONTRACT_GATE_MODE:-warn}"
+export CURSOR_DEV_PATH_GATE_MODE="${CURSOR_DEV_PATH_GATE_MODE:-warn}"  # warn/block
+export CURSOR_DEV_PATH_GATE_STAGE="${CURSOR_DEV_PATH_GATE_STAGE:-1}"   # 1=仅检查勾选, 2=校验路径证据
 
 # 目录白名单（仅当变更命中这些目录/文件时才触发契约门禁）
 # 使用正则（grep -E），多个用 | 连接

@@ -304,6 +304,10 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 - 契约门禁策略：`CURSOR_CONTRACT_GATE_MODE=warn`（默认告警，便于存量项目渐进接入）。
 - 收敛后可加严：将 `CURSOR_CONTRACT_GATE_MODE` 调整为 `block`，在契约未同步时直接阻断合并。
 - DB 门禁策略：`CURSOR_DB_GATE_MODE=warn`（默认告警，可按团队阶段改为 `block`）。
+- 开发路径门禁（建议先告警）：
+  - `CURSOR_DEV_PATH_GATE_MODE=warn`（阶段 1 默认）
+  - `CURSOR_DEV_PATH_GATE_STAGE=1`：仅检查 PR 是否勾选且只勾选一个开发路径（主流程 / 快速路径）
+  - `CURSOR_DEV_PATH_GATE_STAGE=2`：在阶段 1 基础上，额外校验路径证据（主流程需 spec-kit/bridge 证据；快速路径需 `/api-search` + `/implement-task` 证据）
 - 新增或调整接口时，必须同步两处：
   - `spec_center/capability-registry.md`（登记能力条目与同义词）
   - `spec_center/<service>/contracts/openapi.yaml`（更新 endpoint/参数/返回/鉴权/错误码）

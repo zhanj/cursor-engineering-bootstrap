@@ -1,3 +1,7 @@
+## 开发路径（必填）
+- [ ] 主流程（Spec-kit 驱动：`/speckit.specify -> /speckit.plan -> /speckit.tasks -> /bridge-implement`）
+- [ ] 快速路径（小改动：`/api-search -> /implement-task`）
+
 ## 1) 复用依据（必填）
 - 需求关键词：
 - `/api-search` 检索范围（registry/openapi/src/api/pages）：
@@ -36,6 +40,7 @@
 - 回滚方案（步骤 + 触发条件）：
 
 ## 6) 提交前自检（勾选）
+- [ ] 已明确开发路径并勾选（主流程 / 快速路径 二选一）
 - [ ] 已执行复用检索，且记录候选能力 >= 3
 - [ ] 改动落点符合目录规范，未散落实现
 - [ ] 契约影响结论明确并附依据
