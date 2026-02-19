@@ -22,5 +22,9 @@
 - `建议改动文件`
 - `待人工确认`
 - `验证命令`
-- `Spec 资产状态`（`capability-registry/openapi` 的存在性与“待建”项）
-- `Constitution 状态`（`.specify/memory/constitution.md` 的存在性与处理结果：已存在/已补建/待人工处理）
+- `Spec 资产状态`（按状态词输出 `capability-registry/openapi`：`exists`/`missing`/`unreadable`/`path_mismatch`，并标注“待建”项）
+- `Constitution 状态`（按状态词输出 `.specify/memory/constitution.md`：`exists`/`missing`/`unreadable`/`path_mismatch`，以及处理结果：已补建/待人工处理）
+
+## 禁止事项
+- 不直接改业务代码。
+- 不删除已有 `.cursor` 文件；冲突时建议生成 `*.v2`。
