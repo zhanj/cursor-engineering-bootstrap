@@ -52,6 +52,7 @@
 - `Spec 资产状态`：按状态词输出 `capability-registry/openapi`（`exists`/`missing`/`unreadable`/`path_mismatch`）及“待建”项。
 - `Constitution 状态`：按状态词输出 `.specify/memory/constitution.md`（`exists`/`missing`/`unreadable`/`path_mismatch`）与处理结果（已补建/待人工处理）。
 - `Constitution 质量`：`constitution_quality=ready|placeholder|unknown`（若仍含 `[PROJECT_NAME]` / `[PRINCIPLE_1_NAME]` 等占位符，标记 `placeholder`，默认走 `needs_manual_confirm`，不阻断）。
+- `下一步建议`：先 `/init-scan`，若显示 constitution 缺失或质量不足，再执行 `/speckit.constitution`。
 - `覆盖开关状态`：`overwrite=on/off` 与实际动作（`created`/`skipped`/`overwritten`）。
 
 ## 禁止事项

@@ -359,7 +359,8 @@ bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
 
 1. `dry-run -> bundle -> PR 落库`
 2. 在项目里执行 `/init-scan` 完成校准
-3. 若缺 `.specify/memory/constitution.md`，先执行 `/speckit.constitution`（提示词见 `docs/speckit-constitution-prompt.md`）
+   - 先 `/init-scan`，若显示 constitution 缺失或质量不足，再执行 `/speckit.constitution`。
+3. 若仍缺 `.specify/memory/constitution.md`，执行 `/speckit.constitution`（提示词见 `docs/speckit-constitution-prompt.md`）
 4. 执行 `/speckit.specify -> /speckit.plan -> /speckit.tasks`
 5. 执行 `/bridge-implement`
 6. 执行项目标准校验命令（优先 `make ci`，否则按 README）
