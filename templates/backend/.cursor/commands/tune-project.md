@@ -21,11 +21,13 @@
    - `bash bin/cursor-tune --use-current-dir --mode safe`
    - 或 `bash bin/cursor-tune --use-current-dir --mode aggressive`
 6. 再次读取并输出最终产物（report + diff + inventory），给出“已修改/建议人工确认”清单。
-7. 核对 `spec_center` 三件套联动一致性：
+7. 输出必须包含“本次 diff Top N 条真实变更”（建议 N=5，不得写泛化描述）。
+8. 输出必须包含“变化证据段”：列出本次新增/修改的 3~5 个关键文件，并给出每个文件 1 行变更原因（来自 report/diff）。
+9. 核对 `spec_center` 三件套联动一致性：
    - `capability-registry.md`
    - `<service>/spec.md`
    - `<service>/contracts/openapi.yaml`
-8. 核对根目录 `.cursor` 是否已按扫描结果写入 managed blocks（rules/commands/hooks）。
+10. 核对根目录 `.cursor` 是否已按扫描结果写入 managed blocks（rules/commands/hooks）。
 
 ## 输出格式（必须）
 必须按以下 Markdown 模板输出（保持标题与空行，不得压成一行文本）：
@@ -45,6 +47,27 @@
 | 操作 | 路径 |
 |---|---|
 | patched/created | xxx |
+
+## 本次 diff Top N 条真实变更（N=5）
+- 变更 1（文件 + 具体差异）
+- 变更 2（文件 + 具体差异）
+- 变更 3（文件 + 具体差异）
+- 变更 4（文件 + 具体差异）
+- 变更 5（文件 + 具体差异）
+
+## 变化证据段（3~5 个关键文件）
+- `path/to/fileA`：1 行原因（引用 report/diff 的具体变化）
+- `path/to/fileB`：1 行原因（引用 report/diff 的具体变化）
+- `path/to/fileC`：1 行原因（引用 report/diff 的具体变化）
+
+## 无效证据反例（禁止）
+- “已优化多个文件、效果良好” （未给出具体文件与差异）
+- “按预期完成调优” （未给出可审计证据）
+- “修改了配置和文档” （未说明具体路径与变更点）
+
+## 有效证据最小示例（参考）
+- Top N 真实变更示例：`<具体文件路径>` + `<具体改动点>`（如“新增 capability 条目并补充 synonyms”或“新增路由/接口映射”）。
+- 变化证据示例：`<关键文件路径>`：`1 行原因`（必须可在 `_cursor_init/tune.diff` 或 `_cursor_init/tune-report.md` 对应到真实差异）。
 
 ## 待人工确认
 - 逐条列出 `needs_manual_confirm`

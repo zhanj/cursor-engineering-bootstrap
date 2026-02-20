@@ -3,10 +3,7 @@
 目标：把 spec-kit 上层产物（specify/plan/tasks）转换为可执行开发流程，并与现有 `/api-search -> /implement-task -> PR_TEMPLATE -> gates` 对齐。
 
 ## 输入（必须）
-- spec-kit 产物（至少包含）：
-  - 需求规格（spec）
-  - 技术计划（plan）
-  - 任务清单（tasks）
+- spec-kit 产物（至少包含）：需求规格（spec）、技术计划（plan）、任务清单（tasks）。**路径约定**：由 spec-kit 生成时落在 **`specs/<number>-<short-name>/`**（如 `specs/001-heartbeat-version/spec.md`、`plan.md`、`tasks.md`），当前分支建议为同名 feature 分支（如 `001-heartbeat-version`）。
 - 目标服务的 `openapi.yaml`（若涉及接口）
 - 当前分支上下文（已有改动、风险点）
 
