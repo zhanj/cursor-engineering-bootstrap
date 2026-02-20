@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help ci ci-quick ci-full smoke smoke-init smoke-gates smoke-templates smoke-bootstrap smoke-cleanup e2e e2e-dev-path e2e-frontend-dev-path e2e-init-scan
+.PHONY: help ci ci-quick ci-full smoke smoke-init smoke-gates smoke-templates smoke-bootstrap smoke-cleanup smoke-tune e2e e2e-dev-path e2e-frontend-dev-path e2e-init-scan
 
 help:
 	@echo "Available targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make smoke-templates Run template integrity smoke"
 	@echo "  make smoke-bootstrap Run cursor-bootstrap smoke"
 	@echo "  make smoke-cleanup   Run cursor-cleanup smoke"
+	@echo "  make smoke-tune      Run cursor-tune smoke"
 	@echo "  make e2e             Run all end-to-end drills"
 	@echo "  make e2e-dev-path    Run backend dev-path E2E drill"
 	@echo "  make e2e-frontend-dev-path Run frontend dev-path E2E drill"
@@ -41,6 +42,9 @@ smoke-bootstrap:
 
 smoke-cleanup:
 	@bash scripts/smoke/05-cursor-cleanup.sh
+
+smoke-tune:
+	@bash scripts/smoke/06-cursor-tune.sh
 
 e2e:
 	@bash scripts/e2e/run-all.sh

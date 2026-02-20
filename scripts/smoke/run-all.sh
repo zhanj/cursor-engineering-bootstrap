@@ -9,6 +9,7 @@ declare -a STEPS=(
   "03-template-integrity.sh|template integrity"
   "04-cursor-bootstrap.sh|cursor-bootstrap flow"
   "05-cursor-cleanup.sh|cursor-cleanup flow"
+  "06-cursor-tune.sh|cursor-tune flow"
 )
 
 echo "[smoke] start"

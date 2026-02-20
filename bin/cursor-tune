@@ -1,0 +1,410 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMPLATE_CONFIG="${ROOT_DIR}/templates/backend/.cursor/hooks/gates/config.sh"
+
+usage() {
+  echo "Usage:"
+  echo "  bash bin/cursor-tune --target-dir <path> [options]"
+  echo "  bash bin/cursor-tune --use-current-dir [options]"
+  echo
+  echo "Options:"
+  echo "  --target-dir <path>   Target project root (required unless --use-current-dir)"
+  echo "  --use-current-dir     Use current directory as target project root"
+  echo "  --mode <mode>         safe|aggressive (default: aggressive)"
+  echo "  --dry-run             Preview only (write report + diff, no file changes)"
+}
+
+TARGET_DIR=""
+USE_CURRENT_DIR=0
+TUNE_MODE="aggressive"
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target-dir)
+      TARGET_DIR="${2:-}"
+      shift 2
+      ;;
+    --use-current-dir)
+      USE_CURRENT_DIR=1
+      shift
+      ;;
+    --mode)
+      TUNE_MODE="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -n "${TARGET_DIR}" && "${USE_CURRENT_DIR}" == "1" ]]; then
+  echo "Use either --target-dir or --use-current-dir, not both."
+  exit 1
+fi
+if [[ -z "${TARGET_DIR}" && "${USE_CURRENT_DIR}" != "1" ]]; then
+  echo "Missing target directory. Use --target-dir <path> or --use-current-dir."
+  exit 1
+fi
+if [[ "${USE_CURRENT_DIR}" == "1" ]]; then
+  TARGET_DIR="."
+fi
+if [[ ! -d "${TARGET_DIR}" ]]; then
+  echo "Target directory does not exist: ${TARGET_DIR}"
+  exit 1
+fi
+if [[ "${TUNE_MODE}" != "safe" && "${TUNE_MODE}" != "aggressive" ]]; then
+  echo "Invalid --mode: ${TUNE_MODE}. Expected safe|aggressive."
+  exit 1
+fi
+if [[ ! -f "${TEMPLATE_CONFIG}" ]]; then
+  echo "Missing template config: ${TEMPLATE_CONFIG}"
+  exit 1
+fi
+
+PROJECT_DIR="$(cd "${TARGET_DIR}" && pwd)"
+OUT_DIR="${PROJECT_DIR}/_cursor_init"
+mkdir -p "${OUT_DIR}"
+REPORT_FILE="${OUT_DIR}/tune-report.md"
+DIFF_FILE="${OUT_DIR}/tune.diff"
+
+declare -a CHANGED_FILES=()
+declare -a ACTION_LOG=()
+declare -a SUGGEST_LOG=()
+
+add_unique_file() {
+  local rel="$1"
+  local f
+  for f in "${CHANGED_FILES[@]+"${CHANGED_FILES[@]}"}"; do
+    if [[ "${f}" == "${rel}" ]]; then
+      return 0
+    fi
+  done
+  CHANGED_FILES+=("${rel}")
+}
+
+append_action() {
+  ACTION_LOG+=("$1")
+}
+
+append_suggest() {
+  SUGGEST_LOG+=("$1")
+}
+
+SETTINGS_FILE=""
+if compgen -G "${PROJECT_DIR}/settings-*.xml" >/dev/null 2>&1; then
+  SETTINGS_FILE="$(basename "$(ls "${PROJECT_DIR}"/settings-*.xml | head -n 1)")"
+fi
+MULTI_MODULE=0
+if [[ $(find "${PROJECT_DIR}" -name pom.xml | wc -l | tr -d ' ') -gt 1 ]]; then
+  MULTI_MODULE=1
+fi
+HAS_DOC_SQL=0
+if [[ -d "${PROJECT_DIR}/doc/sql" ]]; then
+  HAS_DOC_SQL=1
+fi
+
+WORK_DIR="${PROJECT_DIR}"
+if [[ "${DRY_RUN}" == "1" ]]; then
+  WORK_DIR="$(mktemp -d)"
+  mkdir -p "${WORK_DIR}"
+fi
+
+copy_if_exists_to_work() {
+  local rel="$1"
+  if [[ "${WORK_DIR}" == "${PROJECT_DIR}" ]]; then
+    return 0
+  fi
+  if [[ -f "${PROJECT_DIR}/${rel}" ]]; then
+    mkdir -p "${WORK_DIR}/$(dirname "${rel}")"
+    cp "${PROJECT_DIR}/${rel}" "${WORK_DIR}/${rel}"
+  fi
+}
+
+for rel in \
+  ".cursor/hooks/hooks.json" \
+  ".cursor/hooks/gates/config.sh" \
+  ".cursor/rules/99-project-conventions.mdc" \
+  ".cursor/commands/project-local-conventions.md" \
+  "spec_center/capability-registry.md" \
+  "spec_center/_raw_contracts/README.md"
+do
+  copy_if_exists_to_work "${rel}"
+done
+
+shopt -s nullglob
+for f in "${PROJECT_DIR}"/spec_center/*/contracts/openapi.yaml; do
+  rel="${f#${PROJECT_DIR}/}"
+  copy_if_exists_to_work "${rel}"
+done
+shopt -u nullglob
+
+ensure_file_content() {
+  local rel="$1"
+  local content="$2"
+  local target="${WORK_DIR}/${rel}"
+  mkdir -p "$(dirname "${target}")"
+
+  if [[ ! -f "${target}" ]]; then
+    printf "%s\n" "${content}" > "${target}"
+    add_unique_file "${rel}"
+    append_action "created: ${rel}"
+    return 0
+  fi
+
+  if [[ "${TUNE_MODE}" == "safe" ]] && ! rg -q -F "managed-by: cursor-tune" "${target}"; then
+    append_suggest "needs_manual_confirm: ${rel} exists without marker, skipped in safe mode"
+    return 0
+  fi
+
+  printf "%s\n" "${content}" > "${target}"
+  add_unique_file "${rel}"
+  append_action "patched: ${rel}"
+}
+
+RULES_CONTENT="$(cat <<EOF
+# managed-by: cursor-tune
+
+## 本工程约定（自动维护）
+- 模式：${TUNE_MODE}
+- 多模块：$( [[ "${MULTI_MODULE}" == "1" ]] && echo yes || echo no )
+- maven settings：$( [[ -n "${SETTINGS_FILE}" ]] && echo "${SETTINGS_FILE}" || echo none )
+- 迁移目录补充：$( [[ "${HAS_DOC_SQL}" == "1" ]] && echo "doc/sql/" || echo none )
+EOF
+)"
+ensure_file_content ".cursor/rules/99-project-conventions.mdc" "${RULES_CONTENT}"
+
+COMMANDS_CONTENT="$(cat <<EOF
+# managed-by: cursor-tune
+
+## Project Local Conventions
+- 当前调优模式：${TUNE_MODE}
+- 若存在 settings-*.xml，优先确认单测命令是否需要 -s 参数。
+- 若检测到多模块结构，校准 API/DB 路径正则时保留模块前缀。
+- 若存在 doc/sql/，建议在 DB gate 中补充迁移目录识别。
+EOF
+)"
+ensure_file_content ".cursor/commands/project-local-conventions.md" "${COMMANDS_CONTENT}"
+
+maybe_create_config_from_template() {
+  local rel=".cursor/hooks/gates/config.sh"
+  local target="${WORK_DIR}/${rel}"
+  if [[ ! -f "${target}" ]]; then
+    mkdir -p "$(dirname "${target}")"
+    cp "${TEMPLATE_CONFIG}" "${target}"
+    add_unique_file "${rel}"
+    append_action "created: ${rel}"
+  fi
+}
+
+replace_or_append_export() {
+  local file="$1"
+  local var="$2"
+  local val="$3"
+  if rg -q "^[[:space:]]*export[[:space:]]+${var}=" "${file}"; then
+    python3 - "$file" "$var" "$val" <<'PY'
+import re,sys
+p,var,val=sys.argv[1],sys.argv[2],sys.argv[3]
+s=open(p,encoding="utf-8").read()
+s=re.sub(rf'^\s*export\s+{re.escape(var)}=.*$', f'export {var}="{val}"', s, flags=re.M)
+open(p,"w",encoding="utf-8").write(s)
+PY
+  else
+    printf '\nexport %s="%s"\n' "${var}" "${val}" >> "${file}"
+  fi
+}
+
+tune_config() {
+  local rel=".cursor/hooks/gates/config.sh"
+  local target="${WORK_DIR}/${rel}"
+  maybe_create_config_from_template
+
+  if [[ "${TUNE_MODE}" == "safe" ]] && ! rg -q -F "managed-by: cursor-tune" "${target}"; then
+    append_suggest "needs_manual_confirm: ${rel} exists without marker, skipped in safe mode"
+    return 0
+  fi
+
+  if [[ "${MULTI_MODULE}" == "1" ]]; then
+    replace_or_append_export "${target}" "CURSOR_API_DIR_WHITELIST_RE" ".*/src/main/java/.*/(controller|api|web|rest|resource)/|.*/src/main/java/.*/(dto|vo|form|request|response)/"
+    replace_or_append_export "${target}" "CURSOR_SRC_MAIN_JAVA" "."
+    replace_or_append_export "${target}" "CURSOR_SRC_MAIN_RESOURCES" "."
+    replace_or_append_export "${target}" "CURSOR_DB_GATE_FIND_MAXDEPTH" "14"
+  fi
+  if [[ "${HAS_DOC_SQL}" == "1" ]]; then
+    replace_or_append_export "${target}" "CURSOR_MIGRATION_DIR_EXTRA_RE" "(^|/)(migration|migrations)/|(^|/)doc/sql/"
+  fi
+  add_unique_file "${rel}"
+  append_action "patched: ${rel}"
+}
+
+tune_hooks_json() {
+  local rel=".cursor/hooks/hooks.json"
+  local target="${WORK_DIR}/${rel}"
+
+  if [[ ! -f "${target}" ]]; then
+    mkdir -p "$(dirname "${target}")"
+    cat > "${target}" <<'EOF'
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "backend:unit-test",
+      "when": "pre_commit",
+      "run": "mvn -q test"
+    }
+  ]
+}
+EOF
+    add_unique_file "${rel}"
+    append_action "created: ${rel}"
+  fi
+
+  if [[ -z "${SETTINGS_FILE}" ]]; then
+    append_suggest "hint: no settings-*.xml detected, keep backend:unit-test as-is"
+    return 0
+  fi
+
+  if [[ "${TUNE_MODE}" == "safe" ]]; then
+    append_suggest "needs_manual_confirm: detected ${SETTINGS_FILE}, evaluate adding -s to backend:unit-test"
+    return 0
+  fi
+
+  python3 - "${target}" "${SETTINGS_FILE}" <<'PY'
+import json,sys
+p,settings=sys.argv[1],sys.argv[2]
+obj=json.load(open(p,encoding="utf-8"))
+hooks=obj.get("hooks",[])
+found=False
+for h in hooks:
+  if h.get("name")=="backend:unit-test":
+    run=h.get("run","mvn -q test")
+    if "-s " not in run:
+      h["run"]=f"{run} -s {settings}"
+    found=True
+if not found:
+  hooks.append({"name":"backend:unit-test","when":"pre_commit","run":f"mvn -q test -s {settings}"})
+obj["hooks"]=hooks
+json.dump(obj,open(p,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
+PY
+  add_unique_file "${rel}"
+  append_action "patched: ${rel} (added -s ${SETTINGS_FILE})"
+}
+
+upsert_spec_center() {
+  local service
+  service="$(basename "${PROJECT_DIR}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
+  [[ -z "${service}" ]] && service="service"
+
+  ensure_file_content "spec_center/capability-registry.md" "$(cat <<EOF
+# capability-registry
+
+> managed-by: cursor-tune
+> TODO: add at least 3 reusable capability entries.
+EOF
+)"
+
+  ensure_file_content "spec_center/_raw_contracts/README.md" "$(cat <<'EOF'
+# _raw_contracts
+
+managed-by: cursor-tune
+
+当前状态：待导入原始契约。
+EOF
+)"
+
+  ensure_file_content "spec_center/${service}/contracts/openapi.yaml" "$(cat <<EOF
+openapi: 3.0.0
+x-generated-by: cursor-tune
+info:
+  title: ${service}
+  version: 0.0.1
+paths: {}
+EOF
+)"
+}
+
+tune_config
+tune_hooks_json
+upsert_spec_center
+
+TMP_DIFF_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "${TMP_DIFF_DIR}"
+  if [[ "${DRY_RUN}" == "1" ]]; then
+    rm -rf "${WORK_DIR}"
+  fi
+}
+trap cleanup EXIT
+
+gen_diff_for_file() {
+  local rel="$1"
+  local old="${PROJECT_DIR}/${rel}"
+  local new="${WORK_DIR}/${rel}"
+  if [[ -f "${old}" && -f "${new}" ]]; then
+    diff -u "${old}" "${new}" || true
+  elif [[ ! -f "${old}" && -f "${new}" ]]; then
+    diff -u /dev/null "${new}" || true
+  fi
+}
+
+: > "${DIFF_FILE}"
+for rel in "${CHANGED_FILES[@]+"${CHANGED_FILES[@]}"}"; do
+  gen_diff_for_file "${rel}" >> "${DIFF_FILE}"
+done
+
+if [[ "${DRY_RUN}" != "1" && "${WORK_DIR}" != "${PROJECT_DIR}" ]]; then
+  for rel in "${CHANGED_FILES[@]+"${CHANGED_FILES[@]}"}"; do
+    mkdir -p "${PROJECT_DIR}/$(dirname "${rel}")"
+    cp "${WORK_DIR}/${rel}" "${PROJECT_DIR}/${rel}"
+  done
+fi
+
+{
+  echo "# cursor-tune report"
+  echo
+  echo "- mode: ${TUNE_MODE}"
+  echo "- dry_run: $( [[ "${DRY_RUN}" == "1" ]] && echo yes || echo no )"
+  echo "- target: ${PROJECT_DIR}"
+  echo "- multi_module: $( [[ "${MULTI_MODULE}" == "1" ]] && echo yes || echo no )"
+  echo "- doc_sql: $( [[ "${HAS_DOC_SQL}" == "1" ]] && echo yes || echo no )"
+  echo "- settings_file: ${SETTINGS_FILE:-none}"
+  echo
+  echo "## Applied (upsert)"
+  if [[ ${#ACTION_LOG[@]} -eq 0 ]]; then
+    echo "- none"
+  else
+    for line in "${ACTION_LOG[@]+"${ACTION_LOG[@]}"}"; do
+      echo "- ${line}"
+    done
+  fi
+  echo
+  echo "## Suggestions"
+  if [[ ${#SUGGEST_LOG[@]} -eq 0 ]]; then
+    echo "- none"
+  else
+    for line in "${SUGGEST_LOG[@]+"${SUGGEST_LOG[@]}"}"; do
+      echo "- ${line}"
+    done
+  fi
+  echo
+  echo "## Outputs"
+  echo "- ${REPORT_FILE}"
+  echo "- ${DIFF_FILE}"
+} > "${REPORT_FILE}"
+
+echo "[cursor-tune] done"
+echo "- report: ${REPORT_FILE}"
+echo "- diff: ${DIFF_FILE}"

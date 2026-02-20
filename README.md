@@ -299,6 +299,31 @@ bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-
   - 仅删除带 marker 的占位文件（由 `--enrich-spec-center` 生成）
   - 包含：`capability-registry.md`、`_raw_contracts/README.md`、带 `x-generated-by` 的占位 `openapi.yaml`
 
+## 二次定制（bin/cursor-tune）
+
+用于在 `/init-scan` 后按目标工程结构执行“存在即修改，不存在即新增（upsert）”的二次调优，并输出可审计 diff。
+
+```bash
+# 预览（不落盘）
+bash bin/cursor-tune --target-dir /path/to/target-repo --dry-run
+
+# 强执行（默认 aggressive）
+bash bin/cursor-tune --target-dir /path/to/target-repo --mode aggressive
+
+# 安全模式（只改带 marker 区块，其余给建议）
+bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
+```
+
+产物：
+
+- `_cursor_init/tune-report.md`
+- `_cursor_init/tune.diff`
+
+说明：
+
+- `aggressive`：默认 upsert（存在则改，不存在则增）
+- `safe`：仅改带 `managed-by: cursor-tune` 的内容；其余输出 `needs_manual_confirm`
+
 ## 推荐落地顺序（团队视角）
 
 1. 先落地 Spec Center（契约与能力索引中心）
@@ -379,7 +404,7 @@ bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-
 
 ### Smoke tests（已内置）
 
-仓库内置了 5 类 smoke tests + 1 个总入口：
+仓库内置了 6 类 smoke tests + 1 个总入口：
 
 - `scripts/smoke/01-cursor-init-outputs.sh`
   - 断言 `bin/cursor-init` 在 `backend/frontend/spec_center` 三种 mode 下都能产出预期文件
@@ -391,6 +416,8 @@ bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-
   - 检查 `bin/cursor-bootstrap` 的 merge/overwrite 与 spec_center 丰满参数行为
 - `scripts/smoke/05-cursor-cleanup.sh`
   - 检查 `bin/cursor-cleanup` 的 dry-run 与 apply 删除行为
+- `scripts/smoke/06-cursor-tune.sh`
+  - 检查 `bin/cursor-tune` 的 dry-run/aggressive 模式与 diff 产出
 - `scripts/smoke/run-all.sh`
   - 一键运行全部 smoke tests
 
@@ -432,6 +459,7 @@ make smoke-gates
 make smoke-templates
 make smoke-bootstrap
 make smoke-cleanup
+make smoke-tune
 ```
 
 CI 自动执行：
