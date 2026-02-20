@@ -31,6 +31,14 @@ assert_contains() {
   }
 }
 
+assert_not_file() {
+  local path="$1"
+  [[ ! -f "${path}" ]] || {
+    echo "[smoke:bootstrap] expected file to be absent: ${path}"
+    exit 1
+  }
+}
+
 run_merge_case() {
   local workdir
   workdir="$(mktemp -d)"
@@ -48,6 +56,9 @@ EOF
 
   assert_file "${workdir}/_cursor_init/bootstrap-report.md"
   assert_file "${workdir}/_cursor_init/init-scan-mirror.md"
+  assert_file "${workdir}/bin/cursor-tune"
+  assert_file "${workdir}/bin/cursor-bootstrap"
+  assert_file "${workdir}/bin/cursor-cleanup"
   assert_file "${workdir}/.cursor/commands/init-scan.md"
   assert_file "${workdir}/.cursor/rules/00-core.mdc"
   assert_file "${workdir}/.cursor/hooks/gates/config.sh"
@@ -72,6 +83,7 @@ EOF
 
   assert_contains "${workdir}/.cursor/hooks/hooks.json" "backend:unit-test"
   assert_contains "${workdir}/_cursor_init/init-scan-mirror.md" "action_summary=overwritten"
+  assert_contains "${workdir}/_cursor_init/bootstrap-report.md" "include_bin_wrappers=yes"
 }
 
 run_frontend_case() {
@@ -87,6 +99,7 @@ run_frontend_case() {
 
   assert_file "${workdir}/_cursor_init/bootstrap-report.md"
   assert_file "${workdir}/_cursor_init/init-scan-mirror.md"
+  assert_file "${workdir}/bin/cursor-tune"
   assert_file "${workdir}/.cursor/commands/init-scan.md"
   assert_file "${workdir}/.cursor/hooks/hooks.json"
   assert_contains "${workdir}/.cursor/hooks/hooks.json" "frontend:lint"
@@ -111,9 +124,25 @@ run_init_scan_overwrite_and_enrich_case() {
   assert_contains "${workdir}/_cursor_init/init-scan-mirror.md" "enrich_spec_center=on"
 }
 
+run_no_wrapper_case() {
+  local workdir
+  workdir="$(mktemp -d)"
+  trap 'rm -rf "${workdir}"' RETURN
+
+  bash "${BIN_PATH}" \
+    --target-dir "${workdir}" \
+    --no-bin-wrappers >/dev/null
+
+  assert_not_file "${workdir}/bin/cursor-tune"
+  assert_not_file "${workdir}/bin/cursor-bootstrap"
+  assert_not_file "${workdir}/bin/cursor-cleanup"
+  assert_contains "${workdir}/_cursor_init/bootstrap-report.md" "include_bin_wrappers=no"
+}
+
 run_merge_case
 run_overwrite_case
 run_frontend_case
 run_init_scan_overwrite_and_enrich_case
+run_no_wrapper_case
 
 echo "[smoke:bootstrap] PASS"

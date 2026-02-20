@@ -56,6 +56,11 @@ run_mode() {
   assert_file "${workdir}/_cursor_init/apply_plan.md"
   assert_file "${workdir}/_cursor_init/hooks.suggested.json"
   assert_file "${workdir}/_cursor_init/cursor-bootstrap-readme.md"
+  assert_file "${workdir}/bin/cursor-tune"
+  assert_file "${workdir}/bin/cursor-bootstrap"
+  assert_file "${workdir}/bin/cursor-cleanup"
+  assert_contains "${workdir}/bin/cursor-tune" "managed-by: cursor-bootstrap-wrapper"
+  assert_contains "${workdir}/bin/cursor-tune" "CURSOR_BOOTSTRAP_REPO"
 
   assert_contains "${workdir}/_cursor_init/report.md" "项目识别"
 

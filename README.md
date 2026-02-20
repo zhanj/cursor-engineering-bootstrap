@@ -145,6 +145,7 @@ bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /p
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes --overwrite
 bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-dry-run
 bash bin/cursor-init bundle --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bootstrap-readme
+bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bin-wrappers
 ```
 
 spec-kit 集成参数：
@@ -159,6 +160,7 @@ spec-kit 集成参数：
 - `--overwrite`：允许覆盖已存在的 spec-kit 资产（默认不覆盖）
 - `--spec-kit-force`：兼容参数，等价于 `--overwrite`（高风险，需与 `--execute-spec-kit` 同时使用）
 - `--no-bootstrap-readme`：不生成 bootstrap README 快照（默认会生成）
+- `--no-bin-wrappers`：不在目标仓自动生成 `bin/cursor-tune|cursor-bootstrap|cursor-cleanup`
 
 说明：
 
@@ -179,6 +181,7 @@ spec-kit 集成参数：
 - `hooks.suggested.json`：自动推断的 hooks 命令建议
 - `cursor-bootstrap-readme.md`：bootstrap 说明快照（供 Cursor 检索，默认生成；可用 `--no-bootstrap-readme` 关闭）
 - `specify-init.log`：spec-kit 初始化执行日志（仅 `--with-spec-kit` 时生成）
+- `bin/cursor-tune`、`bin/cursor-bootstrap`、`bin/cursor-cleanup`：目标仓 wrapper（默认生成，可用 `--no-bin-wrappers` 关闭）
 
 若启用 `--with-spec-kit`，`report.md` 还会包含：
 
@@ -259,6 +262,7 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-curs
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --init-scan-overwrite on
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --enrich-spec-center
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
+bash bin/cursor-bootstrap --target-dir /path/to/target-repo --no-bin-wrappers
 ```
 
 ### 关键开关
@@ -276,6 +280,7 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
     - `spec_center/<service>/contracts/openapi.yaml`
     - `spec_center/_raw_contracts/README.md`（标注“待导入原始契约”）
 - `--plan-only`：只生成报告与 bundle，不执行根目录写入
+- `--no-bin-wrappers`：不在目标仓自动生成 `bin/cursor-tune|cursor-bootstrap|cursor-cleanup`
 
 ### 产物
 

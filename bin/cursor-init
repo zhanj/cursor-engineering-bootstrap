@@ -22,6 +22,7 @@ usage() {
   echo "  --overwrite                   Allow overwriting existing spec-kit assets"
   echo "  --spec-kit-force              Add '--force' to spec-kit init (high-risk, explicit only)"
   echo "  --no-bootstrap-readme         Do not include bootstrap README in generated outputs"
+  echo "  --no-bin-wrappers            Do not generate bin wrappers in target repo"
 }
 
 CMD="${1:-}"
@@ -36,6 +37,7 @@ OVERWRITE=0
 TARGET_DIR=""
 USE_CURRENT_DIR=0
 INCLUDE_BOOTSTRAP_README=1
+INCLUDE_BIN_WRAPPERS=1
 shift || true
 
 while [[ $# -gt 0 ]]; do
@@ -98,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-bootstrap-readme)
       INCLUDE_BOOTSTRAP_README=0
+      shift
+      ;;
+    --no-bin-wrappers)
+      INCLUDE_BIN_WRAPPERS=0
       shift
       ;;
     *) shift ;;
@@ -184,6 +190,9 @@ HOOKS_SUGGESTED="${OUT_DIR}/hooks.suggested.json"
 BOOTSTRAP_README_OUT="${OUT_DIR}/cursor-bootstrap-readme.md"
 SPEC_KIT_INIT_LOG="${OUT_DIR}/specify-init.log"
 SPECKIT_CONSTITUTION_PROMPT_SRC="${ROOT_DIR}/docs/speckit-constitution-prompt.md"
+BIN_WRAPPER_MARKER="managed-by: cursor-bootstrap-wrapper"
+BIN_WRAPPER_STATUS="not_requested"
+BIN_WRAPPER_HINT="disabled"
 
 SEARCH_EXCLUDES=(
   ".git"
@@ -601,9 +610,126 @@ EOF
   cat "${src_readme}" >> "${BOOTSTRAP_README_OUT}"
 }
 
+upsert_bin_wrapper() {
+  local wrapper_name="$1"
+  local wrapper_path="${PROJECT_DIR}/bin/${wrapper_name}"
+  local managed_content="$2"
+
+  mkdir -p "${PROJECT_DIR}/bin"
+  if [[ -f "${wrapper_path}" ]] && ! rg -q -F "${BIN_WRAPPER_MARKER}" "${wrapper_path}"; then
+    BIN_WRAPPER_HINT="existing_non_managed_wrapper"
+    echo "[wrappers] skip non-managed wrapper: ${wrapper_path}" >> "${REPORT}"
+    return 0
+  fi
+
+  printf "%s\n" "${managed_content}" > "${wrapper_path}"
+  chmod +x "${wrapper_path}"
+}
+
+ensure_bin_wrappers() {
+  if [[ "${INCLUDE_BIN_WRAPPERS}" != "1" ]]; then
+    BIN_WRAPPER_STATUS="disabled"
+    BIN_WRAPPER_HINT="pass --no-bin-wrappers"
+    return 0
+  fi
+
+  local repo_hint="${ROOT_DIR}"
+  local wrapper_common_header
+  wrapper_common_header="$(cat <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ${BIN_WRAPPER_MARKER}
+BOOTSTRAP_REPO="\${CURSOR_BOOTSTRAP_REPO:-${repo_hint}}"
+EOF
+)"
+
+  upsert_bin_wrapper "cursor-tune" "$(cat <<EOF
+${wrapper_common_header}
+TARGET_SCRIPT="\${BOOTSTRAP_REPO}/bin/cursor-tune"
+
+if [[ ! -f "\${TARGET_SCRIPT}" ]]; then
+  echo "[cursor-tune wrapper] missing script: \${TARGET_SCRIPT}"
+  echo "Hint: export CURSOR_BOOTSTRAP_REPO=/path/to/cursor-engineering-bootstrap"
+  exit 1
+fi
+
+has_target_flag=0
+for arg in "\$@"; do
+  if [[ "\${arg}" == "--target-dir" || "\${arg}" == "--use-current-dir" ]]; then
+    has_target_flag=1
+    break
+  fi
+done
+
+if [[ "\${has_target_flag}" == "1" ]]; then
+  exec bash "\${TARGET_SCRIPT}" "\$@"
+else
+  exec bash "\${TARGET_SCRIPT}" --target-dir "\$(pwd)" "\$@"
+fi
+EOF
+)"
+
+  upsert_bin_wrapper "cursor-bootstrap" "$(cat <<EOF
+${wrapper_common_header}
+TARGET_SCRIPT="\${BOOTSTRAP_REPO}/bin/cursor-bootstrap"
+
+if [[ ! -f "\${TARGET_SCRIPT}" ]]; then
+  echo "[cursor-bootstrap wrapper] missing script: \${TARGET_SCRIPT}"
+  echo "Hint: export CURSOR_BOOTSTRAP_REPO=/path/to/cursor-engineering-bootstrap"
+  exit 1
+fi
+
+has_target_flag=0
+for arg in "\$@"; do
+  if [[ "\${arg}" == "--target-dir" || "\${arg}" == "--use-current-dir" ]]; then
+    has_target_flag=1
+    break
+  fi
+done
+
+if [[ "\${has_target_flag}" == "1" ]]; then
+  exec bash "\${TARGET_SCRIPT}" "\$@"
+else
+  exec bash "\${TARGET_SCRIPT}" --target-dir "\$(pwd)" "\$@"
+fi
+EOF
+)"
+
+  upsert_bin_wrapper "cursor-cleanup" "$(cat <<EOF
+${wrapper_common_header}
+TARGET_SCRIPT="\${BOOTSTRAP_REPO}/bin/cursor-cleanup"
+
+if [[ ! -f "\${TARGET_SCRIPT}" ]]; then
+  echo "[cursor-cleanup wrapper] missing script: \${TARGET_SCRIPT}"
+  echo "Hint: export CURSOR_BOOTSTRAP_REPO=/path/to/cursor-engineering-bootstrap"
+  exit 1
+fi
+
+has_target_flag=0
+for arg in "\$@"; do
+  if [[ "\${arg}" == "--target-dir" || "\${arg}" == "--use-current-dir" ]]; then
+    has_target_flag=1
+    break
+  fi
+done
+
+if [[ "\${has_target_flag}" == "1" ]]; then
+  exec bash "\${TARGET_SCRIPT}" "\$@"
+else
+  exec bash "\${TARGET_SCRIPT}" --target-dir "\$(pwd)" "\$@"
+fi
+EOF
+)"
+
+  BIN_WRAPPER_STATUS="generated"
+  BIN_WRAPPER_HINT="set CURSOR_BOOTSTRAP_REPO to override default path"
+}
+
 main() {
   write_skeletons
   write_bootstrap_readme
+  ensure_bin_wrappers
   check_spec_kit_env
   run_spec_kit_init
   if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
@@ -659,6 +785,8 @@ EOF
   else
     echo "- bootstrap_readme: disabled (--no-bootstrap-readme)" >> "${REPORT}"
   fi
+  echo "- bin_wrappers: ${BIN_WRAPPER_STATUS}" >> "${REPORT}"
+  echo "- bin_wrapper_hint: ${BIN_WRAPPER_HINT}" >> "${REPORT}"
 
   if [[ "${CMD}" == "bundle" ]]; then
     bundle_templates
@@ -669,6 +797,11 @@ EOF
   echo " - ${TREE}"
   echo " - ${PLAN}"
   echo " - ${HOOKS_SUGGESTED}"
+  if [[ "${INCLUDE_BIN_WRAPPERS}" == "1" ]]; then
+    echo " - ${PROJECT_DIR}/bin/cursor-tune"
+    echo " - ${PROJECT_DIR}/bin/cursor-bootstrap"
+    echo " - ${PROJECT_DIR}/bin/cursor-cleanup"
+  fi
   if [[ "${WITH_SPEC_KIT}" == "1" ]]; then
     echo " - ${SPEC_KIT_INIT_LOG}"
   fi

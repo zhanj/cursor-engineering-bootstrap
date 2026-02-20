@@ -21,6 +21,7 @@ usage() {
   echo "  --init-scan-overwrite <on|off>  Overwrite policy used by init-scan mirror semantics"
   echo "  --enrich-spec-center          Fill minimal spec_center skeleton (safe, non-destructive by default)"
   echo "  --no-bootstrap-readme         Do not include bootstrap README snapshot"
+  echo "  --no-bin-wrappers            Do not generate bin wrappers in target repo"
   echo "  --plan-only                   Generate reports/bundle only, no root .cursor apply"
   echo "  --apply-to-root-cursor        Apply .cursor assets into target root .cursor"
   echo "  --apply-mode <mode>           merge|overwrite|report-only (default: merge)"
@@ -35,6 +36,7 @@ EXECUTE_SPEC_KIT=0
 SPEC_KIT_YES=0
 OVERWRITE=0
 INCLUDE_BOOTSTRAP_README=1
+INCLUDE_BIN_WRAPPERS=1
 PLAN_ONLY=0
 APPLY_TO_ROOT_CURSOR=0
 APPLY_MODE="merge"
@@ -87,6 +89,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-bootstrap-readme)
       INCLUDE_BOOTSTRAP_README=0
+      shift
+      ;;
+    --no-bin-wrappers)
+      INCLUDE_BIN_WRAPPERS=0
       shift
       ;;
     --plan-only)
@@ -206,6 +212,9 @@ build_common_args() {
   fi
   if [[ "${INCLUDE_BOOTSTRAP_README}" != "1" ]]; then
     common_args+=(--no-bootstrap-readme)
+  fi
+  if [[ "${INCLUDE_BIN_WRAPPERS}" != "1" ]]; then
+    common_args+=(--no-bin-wrappers)
   fi
 }
 
@@ -494,6 +503,7 @@ cat > "${BOOTSTRAP_REPORT}" <<EOF
 - overwrite=$( [[ "${OVERWRITE}" == "1" ]] && echo on || echo off )
 - init_scan_overwrite=${INIT_SCAN_OVERWRITE}
 - enrich_spec_center=$( [[ "${ENRICH_SPEC_CENTER}" == "1" ]] && echo on || echo off )
+- include_bin_wrappers=$( [[ "${INCLUDE_BIN_WRAPPERS}" == "1" ]] && echo yes || echo no )
 - plan_only=$( [[ "${PLAN_ONLY}" == "1" ]] && echo yes || echo no )
 - apply_to_root_cursor=$( [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]] && echo yes || echo no )
 - apply_mode=${APPLY_MODE}
@@ -503,6 +513,7 @@ cat > "${BOOTSTRAP_REPORT}" <<EOF
 - patch bundle: ${OUT_DIR}/patch_bundle/${MODE}/
 - init-scan mirror: ${INIT_SCAN_MIRROR_REPORT}
 - spec-kit log: ${OUT_DIR}/specify-init.log (when --with-spec-kit)
+- wrappers: ${PROJECT_DIR}/bin/{cursor-tune,cursor-bootstrap,cursor-cleanup} (unless --no-bin-wrappers)
 
 ## Next
 - Review ${OUT_DIR}/patch_bundle/${MODE}/ and ${INIT_SCAN_MIRROR_REPORT}
