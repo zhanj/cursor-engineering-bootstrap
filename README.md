@@ -8,7 +8,7 @@
 - `Backend 模板`：`rules + commands + hooks + PR_TEMPLATE`
 - `Frontend 模板`：`rules + commands + hooks + PR_TEMPLATE`
 - `init-runner`：通过 `dry-run` 和 `bundle` 生成可审查的落库方案
-- `bootstrap-runner`：`bin/cursor-bootstrap` 一键编排（backend 最小版）
+- `bootstrap-runner`：`bin/cursor-bootstrap` 一键编排（backend/frontend）
 
 一句话：先规范“怎么做”，再规范“怎么提交证明做对了”。
 
@@ -46,7 +46,7 @@ bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode backend 
 
 将 `_cursor_init/patch_bundle/backend/` 通过 PR 方式落库。
 
-也可以使用一键编排（backend 最小版）：
+也可以使用一键编排（backend）：
 
 ```bash
 bash path/to/cursor-engineering-bootstrap/bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
@@ -244,7 +244,7 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 
 ---
 
-## 一键编排（bin/cursor-bootstrap，backend 最小版）
+## 一键编排（bin/cursor-bootstrap，backend/frontend）
 
 用于把初始化动作串起来执行：`dry-run -> bundle -> (可选)spec-kit init -> (可选)写入目标仓根目录 .cursor -> (可选)spec_center 最小丰满 -> init-scan 镜像报告`。
 
@@ -252,6 +252,7 @@ bash bin/cursor-init bundle --mode spec_center --use-current-dir
 
 ```bash
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo
+bash bin/cursor-bootstrap --mode frontend --target-dir /path/to/frontend-repo
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode overwrite --overwrite
@@ -262,6 +263,7 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
 
 ### 关键开关
 
+- `--mode backend|frontend`：选择模板与镜像校准目标（默认 `backend`）
 - `--apply-to-root-cursor`：把模板中的 `.cursor` 资产直接写入目标仓根 `.cursor/`
 - `--apply-mode merge|overwrite|report-only`：
   - `merge`（默认）：只补缺，不覆盖已有文件

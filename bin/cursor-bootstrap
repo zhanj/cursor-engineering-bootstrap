@@ -10,7 +10,7 @@ usage() {
   echo "  bash bin/cursor-bootstrap --use-current-dir [options]"
   echo
   echo "Options:"
-  echo "  --mode backend                Bootstrap mode (minimal version supports backend only)"
+  echo "  --mode backend|frontend       Bootstrap mode (default: backend)"
   echo "  --target-dir <path>           Target project root (required unless --use-current-dir)"
   echo "  --use-current-dir             Use current directory as target project root"
   echo "  --with-spec-kit               Enable spec-kit checks"
@@ -113,8 +113,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${MODE}" != "backend" ]]; then
-  echo "Minimal cursor-bootstrap currently supports only --mode backend."
+if [[ "${MODE}" != "backend" && "${MODE}" != "frontend" ]]; then
+  echo "Unsupported --mode: ${MODE}. Expected backend|frontend."
   exit 1
 fi
 
@@ -390,9 +390,20 @@ build_init_scan_mirror() {
     fi
   fi
 
-  if [[ -f "${PROJECT_DIR}/.cursor/hooks/hooks.json" ]] && [[ -f "${PROJECT_DIR}/.cursor/hooks/gates/config.sh" ]]; then
-    hooks_status="ok"
-    hooks_cmd_check="pass"
+  if [[ -f "${PROJECT_DIR}/.cursor/hooks/hooks.json" ]]; then
+    if [[ "${MODE}" == "backend" ]]; then
+      if [[ -f "${PROJECT_DIR}/.cursor/hooks/gates/config.sh" ]]; then
+        hooks_status="ok"
+        hooks_cmd_check="pass"
+      else
+        hooks_status="path_mismatch"
+        hooks_cmd_check="fail(missing backend gates config)"
+      fi
+    else
+      # Frontend default template has hooks without gates config.
+      hooks_status="ok"
+      hooks_cmd_check="pass"
+    fi
     if [[ "${APPLY_TO_ROOT_CURSOR}" == "1" ]]; then
       hooks_action="${overlay_action}"
     else
@@ -472,7 +483,7 @@ echo "[cursor-bootstrap] step 5/5: write bootstrap reports"
 build_init_scan_mirror
 
 cat > "${BOOTSTRAP_REPORT}" <<EOF
-# cursor-bootstrap report (minimal/backend)
+# cursor-bootstrap report (${MODE})
 
 ## Input
 - mode=${MODE}

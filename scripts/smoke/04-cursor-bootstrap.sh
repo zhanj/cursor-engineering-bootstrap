@@ -74,6 +74,25 @@ EOF
   assert_contains "${workdir}/_cursor_init/init-scan-mirror.md" "action_summary=overwritten"
 }
 
+run_frontend_case() {
+  local workdir
+  workdir="$(mktemp -d)"
+  trap 'rm -rf "${workdir}"' RETURN
+
+  bash "${BIN_PATH}" \
+    --mode frontend \
+    --target-dir "${workdir}" \
+    --apply-to-root-cursor \
+    --apply-mode merge >/dev/null
+
+  assert_file "${workdir}/_cursor_init/bootstrap-report.md"
+  assert_file "${workdir}/_cursor_init/init-scan-mirror.md"
+  assert_file "${workdir}/.cursor/commands/init-scan.md"
+  assert_file "${workdir}/.cursor/hooks/hooks.json"
+  assert_contains "${workdir}/.cursor/hooks/hooks.json" "frontend:lint"
+  assert_contains "${workdir}/_cursor_init/bootstrap-report.md" "mode=frontend"
+}
+
 run_init_scan_overwrite_and_enrich_case() {
   local workdir
   workdir="$(mktemp -d)"
@@ -94,6 +113,7 @@ run_init_scan_overwrite_and_enrich_case() {
 
 run_merge_case
 run_overwrite_case
+run_frontend_case
 run_init_scan_overwrite_and_enrich_case
 
 echo "[smoke:bootstrap] PASS"

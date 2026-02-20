@@ -26,6 +26,12 @@
    - 对比 `.cursor/hooks/hooks.json` 与 `_cursor_init/hooks.suggested.json`，输出差异。
    - 校准 `.cursor/hooks/gates/config.sh` 中目录正则（controller/api、migration、mybatis xml）。
    - 校验 hooks 命令在当前仓可执行（命令可运行、路径可达、门禁模式符合团队约定）。
+   - Maven settings 仅做“条件提示，不强制”：
+     - 若仓库存在 `settings-*.xml`，输出 `needs_manual_confirm` 提示，建议评估 `backend:unit-test` 是否需要 `mvn ... -s <settings-file>`。
+     - 仅当存在明确信号（如 README/脚本已要求 `-s` 或直接验证失败且原因明确）时，再建议 `hooks_action=patched`。
+   - 多模块与迁移目录仅做“建议校准，不强制”：
+     - 若检测到多模块路径（如 `*/src/main/java/*`），建议调整 API 白名单正则以匹配模块前缀。
+     - 若检测到非常规迁移目录（如 `doc/sql/`），建议补充 `CURSOR_MIGRATION_DIR_EXTRA_RE`。
 5. 对 `spec_center` 与 `constitution` 执行“补缺不覆盖”策略（与 `--overwrite` 开关对齐）：
    - `spec_center` 缺失 + `overwrite=off`：补建最小资产（至少 `capability-registry.md` 与 `<service>/contracts/openapi.yaml` 占位）。
    - `spec_center` 已存在 + `overwrite=off`：保持现状，不覆盖。
@@ -45,6 +51,7 @@
 - `Hooks 状态`：`hooks_status=ok|missing|invalid_command|path_mismatch`，`hooks_cmd_check=pass|fail(+reason)`，`hooks_action=created|patched|skipped|overwritten|needs_manual_merge`。
 - `Spec 资产状态`：按状态词输出 `capability-registry/openapi`（`exists`/`missing`/`unreadable`/`path_mismatch`）及“待建”项。
 - `Constitution 状态`：按状态词输出 `.specify/memory/constitution.md`（`exists`/`missing`/`unreadable`/`path_mismatch`）与处理结果（已补建/待人工处理）。
+- `Constitution 质量`：`constitution_quality=ready|placeholder|unknown`（若仍含 `[PROJECT_NAME]` / `[PRINCIPLE_1_NAME]` 等占位符，标记 `placeholder`，默认走 `needs_manual_confirm`，不阻断）。
 - `覆盖开关状态`：`overwrite=on/off` 与实际动作（`created`/`skipped`/`overwritten`）。
 
 ## 禁止事项
@@ -59,6 +66,7 @@
 - `待人工确认`：
   - 是否将 `CURSOR_CONTRACT_GATE_MODE` 保持 `warn`（后续何时切 `block`）
   - Spec Center 接入路径是否统一为 `spec_center/`
+  - 如仓库存在 `settings-*.xml`，是否将 `backend:unit-test` 增加 `-s <settings-file>`（仅建议，不强制）
 - `验证命令`：
   - `mvn -q test`
   - `bash .cursor/hooks/gates/contract-check.sh`
@@ -68,4 +76,5 @@
 - `Hooks 状态`：`hooks_status=invalid_command`，`hooks_cmd_check=fail(backend:unit-test command not found)`，`hooks_action=patched`
 - `Spec 资产状态`：`capability-registry=exists`，`openapi=missing(path_mismatch)`，`action=created`
 - `Constitution 状态`：`constitution=missing`，`action=created`（已按提示词补建）
+- `Constitution 质量`：`constitution_quality=placeholder`，`action=needs_manual_confirm`
 - `覆盖开关状态`：`overwrite=off`，`action_summary=created+patched+skipped`

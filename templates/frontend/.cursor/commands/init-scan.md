@@ -25,6 +25,9 @@
    - 对比 `.cursor/hooks/hooks.json` 与 `_cursor_init/hooks.suggested.json`。
    - 检查 API 调用风格是否统一（request 封装、错误处理、鉴权头）。
    - 校验 hooks 命令在当前仓可执行（命令可运行、路径可达、门禁模式符合团队约定）。
+   - 命令修正遵循“条件提示优先”：
+     - 若发现项目存在自定义安装源/脚本参数需求，先输出 `needs_manual_confirm` 提示，不默认阻断。
+     - 仅在有明确信号（README/脚本约定或可复现失败）时，建议 `hooks_action=patched`。
 5. 对 `spec_center` 与 `constitution` 执行“补缺不覆盖”策略（与 `--overwrite` 开关对齐）：
    - `spec_center` 缺失 + `overwrite=off`：补建最小资产（至少 `capability-registry.md` 与 `<service>/contracts/openapi.yaml` 占位）。
    - `spec_center` 已存在 + `overwrite=off`：保持现状，不覆盖。
@@ -44,6 +47,7 @@
 - `Hooks 状态`（`hooks_status=ok|missing|invalid_command|path_mismatch`，`hooks_cmd_check=pass|fail(+reason)`，`hooks_action=created|patched|skipped|overwritten|needs_manual_merge`）
 - `Spec 资产状态`（按状态词输出 `capability-registry/openapi`：`exists`/`missing`/`unreadable`/`path_mismatch`，并标注“待建”项）
 - `Constitution 状态`（按状态词输出 `.specify/memory/constitution.md`：`exists`/`missing`/`unreadable`/`path_mismatch`，以及处理结果：已补建/待人工处理）
+- `Constitution 质量`（`constitution_quality=ready|placeholder|unknown`；若仍含占位符，标记 `placeholder` 并进入 `needs_manual_confirm`）
 - `覆盖开关状态`（`overwrite=on/off` 与实际动作：`created`/`skipped`/`overwritten`）
 
 ## 禁止事项
@@ -67,4 +71,5 @@
 - `Hooks 状态`：`hooks_status=invalid_command`，`hooks_cmd_check=fail(frontend:lint command not found)`，`hooks_action=patched`
 - `Spec 资产状态`：`capability-registry=exists`，`openapi=missing(path_mismatch)`，`action=created`
 - `Constitution 状态`：`constitution=missing`，`action=created`（已按提示词补建）
+- `Constitution 质量`：`constitution_quality=placeholder`，`action=needs_manual_confirm`
 - `覆盖开关状态`：`overwrite=off`，`action_summary=created+patched+skipped`
