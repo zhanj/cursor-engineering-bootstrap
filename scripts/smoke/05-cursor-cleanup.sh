@@ -68,6 +68,41 @@ run_case() {
   assert_not_exists "${workdir}/spec_center/_raw_contracts/README.md"
 }
 
+run_cursor_scaffold_case() {
+  local workdir
+  workdir="$(mktemp -d)"
+  trap 'rm -rf "${workdir}"' RETURN
+
+  # Create scaffold files from backend template.
+  mkdir -p "${workdir}/.cursor"
+  rsync -a "${ROOT_DIR}/templates/backend/.cursor/" "${workdir}/.cursor/"
+
+  # Add one user-modified file to ensure safe mode preserves it.
+  printf "\n# user custom line\n" >> "${workdir}/.cursor/hooks/hooks.json"
+
+  # Safe mode apply: should remove unchanged scaffold files, keep modified file.
+  bash "${CLEANUP_BIN}" \
+    --target-dir "${workdir}" \
+    --include-cursor-scaffold \
+    --apply >/dev/null
+
+  assert_exists "${workdir}/.cursor/hooks/hooks.json"
+  assert_not_exists "${workdir}/.cursor/commands/api-search.md"
+
+  # Recreate one scaffold file, then force mode should remove regardless of local edits.
+  mkdir -p "${workdir}/.cursor/commands"
+  cp "${ROOT_DIR}/templates/backend/.cursor/commands/implement-task.md" "${workdir}/.cursor/commands/implement-task.md"
+  printf "\n<!-- modified -->\n" >> "${workdir}/.cursor/commands/implement-task.md"
+
+  bash "${CLEANUP_BIN}" \
+    --target-dir "${workdir}" \
+    --include-cursor-scaffold-force \
+    --apply >/dev/null
+
+  assert_not_exists "${workdir}/.cursor/commands/implement-task.md"
+}
+
 run_case
+run_cursor_scaffold_case
 
 echo "[smoke:cleanup] PASS"

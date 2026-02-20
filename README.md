@@ -292,12 +292,22 @@ bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-
 
 # 执行删除
 bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders --apply
+
+# 清理脚手架创建的 .cursor 文件（安全模式：仅删与模板完全一致的文件）
+bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold --apply
+
+# 强制清理脚手架 .cursor 文件（即使本地有改动也删除）
+bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold-force --apply
 ```
 
 - 默认清理：`_cursor_init/`
 - 可选清理：`--include-spec-center-placeholders`
   - 仅删除带 marker 的占位文件（由 `--enrich-spec-center` 生成）
   - 包含：`capability-registry.md`、`_raw_contracts/README.md`、带 `x-generated-by` 的占位 `openapi.yaml`
+- 可选清理：`--include-cursor-scaffold`
+  - 安全模式：只删除与模板字节完全一致的 `.cursor` 文件，保留用户修改文件
+- 可选清理：`--include-cursor-scaffold-force`
+  - 强制模式：按模板路径清理 `.cursor` 文件，即使有本地改动也删除
 
 ## 二次定制（bin/cursor-tune）
 

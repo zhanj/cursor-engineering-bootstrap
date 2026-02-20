@@ -12,6 +12,8 @@ usage() {
   echo "  --include-bootstrap-output          Include _cursor_init cleanup (default: on)"
   echo "  --no-bootstrap-output               Do not clean _cursor_init"
   echo "  --include-spec-center-placeholders  Include marker-based spec_center placeholder cleanup"
+  echo "  --include-cursor-scaffold           Include scaffold-created .cursor files (safe mode)"
+  echo "  --include-cursor-scaffold-force     Force-remove scaffold .cursor files by template list"
   echo "  --apply                             Execute deletion (default: dry-run preview only)"
 }
 
@@ -19,6 +21,8 @@ TARGET_DIR=""
 USE_CURRENT_DIR=0
 INCLUDE_BOOTSTRAP_OUTPUT=1
 INCLUDE_SPEC_CENTER_PLACEHOLDERS=0
+INCLUDE_CURSOR_SCAFFOLD=0
+INCLUDE_CURSOR_SCAFFOLD_FORCE=0
 APPLY=0
 
 while [[ $# -gt 0 ]]; do
@@ -41,6 +45,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     --include-spec-center-placeholders)
       INCLUDE_SPEC_CENTER_PLACEHOLDERS=1
+      shift
+      ;;
+    --include-cursor-scaffold)
+      INCLUDE_CURSOR_SCAFFOLD=1
+      shift
+      ;;
+    --include-cursor-scaffold-force)
+      INCLUDE_CURSOR_SCAFFOLD=1
+      INCLUDE_CURSOR_SCAFFOLD_FORCE=1
       shift
       ;;
     --apply)
@@ -79,10 +92,17 @@ if [[ ! -d "${TARGET_DIR}" ]]; then
 fi
 
 PROJECT_DIR="$(cd "${TARGET_DIR}" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 declare -a DELETE_PATHS=()
 
 add_delete_path() {
   local p="$1"
+  local e
+  for e in "${DELETE_PATHS[@]+"${DELETE_PATHS[@]}"}"; do
+    if [[ "${e}" == "${p}" ]]; then
+      return 0
+    fi
+  done
   DELETE_PATHS+=("${p}")
 }
 
@@ -90,6 +110,34 @@ if [[ "${INCLUDE_BOOTSTRAP_OUTPUT}" == "1" ]]; then
   if [[ -d "${PROJECT_DIR}/_cursor_init" ]]; then
     add_delete_path "${PROJECT_DIR}/_cursor_init"
   fi
+fi
+
+if [[ "${INCLUDE_CURSOR_SCAFFOLD}" == "1" ]]; then
+  # Safe mode: remove only files that are still byte-identical to templates.
+  # Force mode: remove by template path list even if modified.
+  for mode in backend frontend; do
+    template_root="${ROOT_DIR}/templates/${mode}"
+    if [[ ! -d "${template_root}/.cursor" ]]; then
+      continue
+    fi
+    while IFS= read -r tf; do
+      if [[ ! -f "${tf}" ]]; then
+        continue
+      fi
+      rel="${tf#${template_root}/}"
+      target_file="${PROJECT_DIR}/${rel}"
+      if [[ ! -f "${target_file}" ]]; then
+        continue
+      fi
+      if [[ "${INCLUDE_CURSOR_SCAFFOLD_FORCE}" == "1" ]]; then
+        add_delete_path "${target_file}"
+      else
+        if cmp -s "${tf}" "${target_file}"; then
+          add_delete_path "${target_file}"
+        fi
+      fi
+    done < <(find "${template_root}/.cursor" -type f 2>/dev/null)
+  done
 fi
 
 if [[ "${INCLUDE_SPEC_CENTER_PLACEHOLDERS}" == "1" ]]; then
