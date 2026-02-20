@@ -24,17 +24,39 @@
    - `capability-registry.md`
    - `<service>/spec.md`
    - `<service>/contracts/openapi.yaml`
+8. 核对根目录 `.cursor` 是否已按扫描结果写入 managed blocks（rules/commands/hooks）。
 
 ## 输出格式（必须）
-- `调优模式`：`safe|aggressive`
-- `执行阶段`：`dry-run|apply`
-- `已修改文件`：逐条列出（来自 `_cursor_init/tune-report.md`）
-- `待人工确认`：逐条列出（`needs_manual_confirm`）
-- `产物路径`：
-  - `_cursor_init/tune-report.md`
-  - `_cursor_init/tune.diff`
-  - `_cursor_init/project-inventory.md`
-- `联动校验`：说明三件套是否已互相引用（registry/spec/openapi）
+必须按以下 Markdown 模板输出（保持标题与空行，不得压成一行文本）：
+
+```md
+# /tune-project 执行结果
+
+## 调优模式
+- `safe|aggressive`
+
+## 执行阶段
+- `dry-run`：成功|失败
+- `apply`：成功|未执行
+
+## 已修改文件（来自 _cursor_init/tune-report.md）
+
+| 操作 | 路径 |
+|---|---|
+| patched/created | xxx |
+
+## 待人工确认
+- 逐条列出 `needs_manual_confirm`
+- 若无：`- 无（Suggestions: none）`
+
+## 产物路径
+- `_cursor_init/tune-report.md`
+- `_cursor_init/tune.diff`
+- `_cursor_init/project-inventory.md`
+
+## 联动校验
+- `capability-registry.md` ↔ `<service>/spec.md` ↔ `<service>/contracts/openapi.yaml` 是否互相引用
+```
 
 ## 禁止事项
 - 不跳过 dry-run 直接 apply。
