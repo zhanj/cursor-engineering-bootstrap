@@ -80,10 +80,21 @@ OUT_DIR="${PROJECT_DIR}/_cursor_init"
 mkdir -p "${OUT_DIR}"
 REPORT_FILE="${OUT_DIR}/tune-report.md"
 DIFF_FILE="${OUT_DIR}/tune.diff"
+INVENTORY_FILE="${OUT_DIR}/project-inventory.md"
 
 declare -a CHANGED_FILES=()
 declare -a ACTION_LOG=()
 declare -a SUGGEST_LOG=()
+declare -a MODULE_DIRS=()
+declare -a API_FILES=()
+declare -a SQL_FILES=()
+declare -a SETTINGS_FILES=()
+declare -a OPENAPI_FILES=()
+declare -a SPEC_FILES=()
+declare -a SERVICE_NAMES=()
+declare -a BAD_SERVICE_DIR_HINTS=()
+
+SERVICE_SLUG="service"
 
 add_unique_file() {
   local rel="$1"
@@ -104,18 +115,188 @@ append_suggest() {
   SUGGEST_LOG+=("$1")
 }
 
+contains_in_array() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    if [[ "${item}" == "${needle}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+normalize_slug() {
+  local raw="$1"
+  local out
+  out="$(printf "%s" "${raw}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
+  out="$(printf "%s" "${out}" | sed -E 's/^-+//; s/-+$//; s/-{2,}/-/g')"
+  printf "%s" "${out}"
+}
+
 SETTINGS_FILE=""
-if compgen -G "${PROJECT_DIR}/settings-*.xml" >/dev/null 2>&1; then
-  SETTINGS_FILE="$(basename "$(ls "${PROJECT_DIR}"/settings-*.xml | head -n 1)")"
-fi
 MULTI_MODULE=0
-if [[ $(find "${PROJECT_DIR}" -name pom.xml | wc -l | tr -d ' ') -gt 1 ]]; then
-  MULTI_MODULE=1
-fi
 HAS_DOC_SQL=0
-if [[ -d "${PROJECT_DIR}/doc/sql" ]]; then
-  HAS_DOC_SQL=1
-fi
+
+scan_project() {
+  local sf pom rel rel_dir api sql openapi rel_openapi spec rel_spec service_raw service_name raw_service
+
+  shopt -s nullglob
+  for sf in "${PROJECT_DIR}"/settings-*.xml; do
+    if [[ -f "${sf}" ]]; then
+      SETTINGS_FILES+=("$(basename "${sf}")")
+    fi
+  done
+  shopt -u nullglob
+  if [[ ${#SETTINGS_FILES[@]} -gt 0 ]]; then
+    SETTINGS_FILE="${SETTINGS_FILES[0]}"
+  fi
+
+  while IFS= read -r pom; do
+    rel="${pom#${PROJECT_DIR}/}"
+    rel_dir="$(dirname "${rel}")"
+    if [[ "${rel_dir}" == "." ]]; then
+      rel_dir="root"
+    fi
+    if ! contains_in_array "${rel_dir}" "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}"; then
+      MODULE_DIRS+=("${rel_dir}")
+    fi
+  done < <(find "${PROJECT_DIR}" -type f -name pom.xml -not -path "*/target/*" 2>/dev/null)
+  if [[ ${#MODULE_DIRS[@]} -gt 1 ]]; then
+    MULTI_MODULE=1
+  fi
+
+  while IFS= read -r api; do
+    rel="${api#${PROJECT_DIR}/}"
+    API_FILES+=("${rel}")
+  done < <(find "${PROJECT_DIR}" -type f \( -name "*Controller.java" -o -name "*Resource.java" -o -name "*Api.java" -o -name "*Endpoint.java" \) -not -path "*/target/*" 2>/dev/null)
+
+  while IFS= read -r sql; do
+    rel="${sql#${PROJECT_DIR}/}"
+    SQL_FILES+=("${rel}")
+  done < <(find "${PROJECT_DIR}" -type f -name "*.sql" -not -path "*/target/*" 2>/dev/null)
+  if [[ -d "${PROJECT_DIR}/doc/sql" || ${#SQL_FILES[@]} -gt 0 ]]; then
+    HAS_DOC_SQL=1
+  fi
+
+  while IFS= read -r openapi; do
+    rel_openapi="${openapi#${PROJECT_DIR}/}"
+    OPENAPI_FILES+=("${rel_openapi}")
+    service_raw="${rel_openapi#spec_center/}"
+    service_raw="${service_raw%%/*}"
+    service_name="$(normalize_slug "${service_raw}")"
+    if [[ -n "${service_raw}" && "${service_raw}" != "${rel_openapi}" && -n "${service_name}" ]]; then
+      if [[ "${service_raw}" != "${service_name}" ]]; then
+        BAD_SERVICE_DIR_HINTS+=("spec_center/${service_raw} -> spec_center/${service_name}")
+      fi
+      if ! contains_in_array "${service_name}" "${SERVICE_NAMES[@]+"${SERVICE_NAMES[@]}"}"; then
+        SERVICE_NAMES+=("${service_name}")
+      fi
+    fi
+  done < <(find "${PROJECT_DIR}/spec_center" -type f -path "*/contracts/openapi.yaml" 2>/dev/null || true)
+
+  while IFS= read -r spec; do
+    rel_spec="${spec#${PROJECT_DIR}/}"
+    SPEC_FILES+=("${rel_spec}")
+    service_raw="${rel_spec#spec_center/}"
+    service_raw="${service_raw%%/*}"
+    service_name="$(normalize_slug "${service_raw}")"
+    if [[ -n "${service_raw}" && "${service_raw}" != "${rel_spec}" && -n "${service_name}" ]]; then
+      if [[ "${service_raw}" != "${service_name}" ]]; then
+        BAD_SERVICE_DIR_HINTS+=("spec_center/${service_raw} -> spec_center/${service_name}")
+      fi
+      if ! contains_in_array "${service_name}" "${SERVICE_NAMES[@]+"${SERVICE_NAMES[@]}"}"; then
+        SERVICE_NAMES+=("${service_name}")
+      fi
+    fi
+  done < <(find "${PROJECT_DIR}/spec_center" -type f -path "*/spec.md" 2>/dev/null || true)
+
+  raw_service="$(basename "${PROJECT_DIR}")"
+  SERVICE_SLUG="$(normalize_slug "${raw_service}")"
+  if [[ -z "${SERVICE_SLUG}" ]]; then
+    SERVICE_SLUG="service"
+  fi
+  if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then
+    SERVICE_NAMES+=("${SERVICE_SLUG}")
+  fi
+
+  if [[ ${#BAD_SERVICE_DIR_HINTS[@]} -gt 0 ]]; then
+    local hint
+    for hint in "${BAD_SERVICE_DIR_HINTS[@]+"${BAD_SERVICE_DIR_HINTS[@]}"}"; do
+      append_suggest "needs_manual_confirm: normalize duplicated service directory (${hint})"
+    done
+  fi
+}
+
+write_inventory() {
+  local item idx
+  {
+    echo "# project inventory (cursor-tune)"
+    echo
+    echo "- target: ${PROJECT_DIR}"
+    echo "- mode: ${TUNE_MODE}"
+    echo "- modules_detected: ${#MODULE_DIRS[@]}"
+    echo "- api_files_detected: ${#API_FILES[@]}"
+    echo "- sql_files_detected: ${#SQL_FILES[@]}"
+    echo "- settings_files_detected: ${#SETTINGS_FILES[@]}"
+    echo "- openapi_files_detected: ${#OPENAPI_FILES[@]}"
+    echo "- spec_files_detected: ${#SPEC_FILES[@]}"
+    echo "- suggested_service_slug: ${SERVICE_SLUG}"
+    echo
+
+    echo "## Modules"
+    if [[ ${#MODULE_DIRS[@]} -eq 0 ]]; then
+      echo "- none"
+    else
+      idx=0
+      for item in "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}"; do
+        idx=$((idx + 1))
+        if [[ "${idx}" -le 30 ]]; then
+          echo "- ${item}"
+        fi
+      done
+      if [[ "${idx}" -gt 30 ]]; then
+        echo "- ... (truncated)"
+      fi
+    fi
+    echo
+
+    echo "## API Candidate Files"
+    if [[ ${#API_FILES[@]} -eq 0 ]]; then
+      echo "- none"
+    else
+      idx=0
+      for item in "${API_FILES[@]+"${API_FILES[@]}"}"; do
+        idx=$((idx + 1))
+        if [[ "${idx}" -le 50 ]]; then
+          echo "- ${item}"
+        fi
+      done
+      if [[ "${idx}" -gt 50 ]]; then
+        echo "- ... (truncated)"
+      fi
+    fi
+    echo
+
+    echo "## SQL Files"
+    if [[ ${#SQL_FILES[@]} -eq 0 ]]; then
+      echo "- none"
+    else
+      idx=0
+      for item in "${SQL_FILES[@]+"${SQL_FILES[@]}"}"; do
+        idx=$((idx + 1))
+        if [[ "${idx}" -le 50 ]]; then
+          echo "- ${item}"
+        fi
+      done
+      if [[ "${idx}" -gt 50 ]]; then
+        echo "- ... (truncated)"
+      fi
+    fi
+    echo
+  } > "${INVENTORY_FILE}"
+}
 
 WORK_DIR="${PROJECT_DIR}"
 if [[ "${DRY_RUN}" == "1" ]]; then
@@ -145,13 +326,6 @@ do
   copy_if_exists_to_work "${rel}"
 done
 
-shopt -s nullglob
-for f in "${PROJECT_DIR}"/spec_center/*/contracts/openapi.yaml; do
-  rel="${f#${PROJECT_DIR}/}"
-  copy_if_exists_to_work "${rel}"
-done
-shopt -u nullglob
-
 ensure_file_content() {
   local rel="$1"
   local content="$2"
@@ -175,6 +349,16 @@ ensure_file_content() {
   append_action "patched: ${rel}"
 }
 
+scan_project
+write_inventory
+
+for rel in "${OPENAPI_FILES[@]+"${OPENAPI_FILES[@]}"}"; do
+  copy_if_exists_to_work "${rel}"
+done
+for rel in "${SPEC_FILES[@]+"${SPEC_FILES[@]}"}"; do
+  copy_if_exists_to_work "${rel}"
+done
+
 RULES_CONTENT="$(cat <<EOF
 # managed-by: cursor-tune
 
@@ -183,6 +367,9 @@ RULES_CONTENT="$(cat <<EOF
 - 多模块：$( [[ "${MULTI_MODULE}" == "1" ]] && echo yes || echo no )
 - maven settings：$( [[ -n "${SETTINGS_FILE}" ]] && echo "${SETTINGS_FILE}" || echo none )
 - 迁移目录补充：$( [[ "${HAS_DOC_SQL}" == "1" ]] && echo "doc/sql/" || echo none )
+- 模块数量：${#MODULE_DIRS[@]}
+- API 候选数量：${#API_FILES[@]}
+- 清单文件：_cursor_init/project-inventory.md
 EOF
 )"
 ensure_file_content ".cursor/rules/99-project-conventions.mdc" "${RULES_CONTENT}"
@@ -195,6 +382,7 @@ COMMANDS_CONTENT="$(cat <<EOF
 - 若存在 settings-*.xml，优先确认单测命令是否需要 -s 参数。
 - 若检测到多模块结构，校准 API/DB 路径正则时保留模块前缀。
 - 若存在 doc/sql/，建议在 DB gate 中补充迁移目录识别。
+- 先阅读 _cursor_init/project-inventory.md，再决定 spec_center 的能力拆分颗粒度。
 EOF
 )"
 ensure_file_content ".cursor/commands/project-local-conventions.md" "${COMMANDS_CONTENT}"
@@ -304,17 +492,105 @@ PY
 }
 
 upsert_spec_center() {
-  local service
-  service="$(basename "${PROJECT_DIR}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
-  [[ -z "${service}" ]] && service="service"
+  local service module api rel_module module_token openapi_file spec_file
+  local cap_tmp openapi_tmp spec_tmp cap_rows api_rows
+  local cap_id class_name class_root cap_slug cap_words endpoint_hint owner_service
+  local link_tmp link_line link_id link_cap link_ep link_src link_count
+  cap_tmp="$(mktemp)"
+  link_tmp="$(mktemp)"
+  cap_rows=0
 
-  ensure_file_content "spec_center/capability-registry.md" "$(cat <<EOF
-# capability-registry
+  {
+    echo "# Capability Registry（能力索引｜给 /api-search 用）"
+    echo
+    echo "## OwnerType 定义（必须）"
+    echo "- \`internal-self\`：本工程自有服务能力（优先复用）"
+    echo "- \`internal-other\`：公司内其他工程服务能力（次优先）"
+    echo "- \`external-vendor\`：公司外部第三方厂商能力（最后考虑）"
+    echo
+    echo "## /api-search 推荐检索顺序（必须）"
+    echo "1. \`capability-registry.md\`（先按 \`OwnerType\` 优先级检索）"
+    echo "2. \`<service>/contracts/openapi.yaml\`（治理契约）"
+    echo "3. 代码实现（controller/service 或 src/api/pages）"
+    echo "4. \`_raw_contracts/**\`（仅用于溯源、冲突排查、补充信息）"
+    echo
+    echo "同义词示例："
+    echo "- 隐患 = hazard, risk, defect"
+    echo "- 检查 = inspection, check, audit"
+    echo
+    echo "> managed-by: cursor-tune"
+    echo "> source: _cursor_init/project-inventory.md"
+    echo "> modules_detected: ${#MODULE_DIRS[@]}"
+    echo "> api_candidates_detected: ${#API_FILES[@]}"
+    echo
+    echo "能力表（由 cursor-tune 扫描生成，需人工确认后用于语义搜索）："
+    echo
+    echo "| Capability | OwnerType | OwnerService | OwnerTeam | Endpoint | SLA/Tier | Notes | Synonyms |"
+    echo "|---|---|---|---|---|---|---|---|"
+  } > "${cap_tmp}"
 
-> managed-by: cursor-tune
-> TODO: add at least 3 reusable capability entries.
-EOF
-)"
+  api_rows=0
+  for api in "${API_FILES[@]+"${API_FILES[@]}"}"; do
+    class_name="$(basename "${api}" .java)"
+    class_root="${class_name%Controller}"
+    class_root="${class_root%Resource}"
+    class_root="${class_root%Endpoint}"
+    class_root="${class_root%Api}"
+    cap_words="$(printf "%s" "${class_root}" | sed -E 's/([a-z0-9])([A-Z])/\1 \2/g')"
+    cap_slug="$(normalize_slug "${class_root}")"
+    [[ -z "${cap_slug}" ]] && cap_slug="capability"
+    endpoint_hint="/api/${cap_slug}"
+    cap_id="cap.${cap_slug}.$(printf "%03d" $((api_rows + 1)))"
+    owner_service="${SERVICE_SLUG}"
+    if [[ "${api}" == *"/${SERVICE_SLUG}/"* ]]; then
+      owner_service="${SERVICE_SLUG}"
+    fi
+    printf "| %s 管理能力 | %s | %s | todo | %s | core | id=%s; source=%s; spec=%s/spec.md | %s, %s |\n" \
+      "${cap_words}" "internal-self" "${owner_service}" "${endpoint_hint}" "${cap_id}" "${api}" "${owner_service}" "${cap_words}" "${cap_slug}" >> "${cap_tmp}"
+    printf "%s|%s 管理能力|%s|%s\n" "${cap_id}" "${cap_words}" "${endpoint_hint}" "${api}" >> "${link_tmp}"
+    cap_rows=$((cap_rows + 1))
+    api_rows=$((api_rows + 1))
+    if [[ "${api_rows}" -ge 80 ]]; then
+      break
+    fi
+  done
+
+  if [[ "${cap_rows}" -eq 0 ]]; then
+    for module in "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}"; do
+      module_token="$(normalize_slug "${module}")"
+      [[ -z "${module_token}" ]] && module_token="root"
+      printf "| %s 模块能力占位 | internal-self | %s | todo | /api/%s | core | source=%s/src/main/java/**/(controller|api|resource)/**; spec=%s/spec.md | %s |\n" \
+        "${module_token}" "${SERVICE_SLUG}" "${module_token}" "${module}" "${SERVICE_SLUG}" "${module_token}" >> "${cap_tmp}"
+      cap_rows=$((cap_rows + 1))
+    done
+  fi
+
+  if [[ "${cap_rows}" -eq 0 ]]; then
+    echo "| root 模块能力占位 | internal-self | ${SERVICE_SLUG} | todo | /api/root | core | source=src/main/java/**/(controller|api|resource)/**; spec=${SERVICE_SLUG}/spec.md | root |" >> "${cap_tmp}"
+    printf "cap.root.001|root 模块能力占位|/api/root|src/main/java/**/(controller|api|resource)/**\n" >> "${link_tmp}"
+  fi
+
+  {
+    echo
+    echo "## API Candidate Hints (top 30)"
+  } >> "${cap_tmp}"
+  api_rows=0
+  if [[ ${#API_FILES[@]} -eq 0 ]]; then
+    echo "- none" >> "${cap_tmp}"
+  else
+    for api in "${API_FILES[@]+"${API_FILES[@]}"}"; do
+      api_rows=$((api_rows + 1))
+      if [[ "${api_rows}" -le 30 ]]; then
+        echo "- ${api}" >> "${cap_tmp}"
+      fi
+    done
+    if [[ "${api_rows}" -gt 30 ]]; then
+      echo "- ... (truncated)" >> "${cap_tmp}"
+    fi
+  fi
+
+  ensure_file_content "spec_center/capability-registry.md" "$(cat "${cap_tmp}")"
+  rm -f "${cap_tmp}"
 
   ensure_file_content "spec_center/_raw_contracts/README.md" "$(cat <<'EOF'
 # _raw_contracts
@@ -322,18 +598,175 @@ EOF
 managed-by: cursor-tune
 
 当前状态：待导入原始契约。
+
+建议：
+- 将外部系统原始 openapi/json/yaml 放入本目录。
+- 在 capability-registry 中标记 source=external-* 并补充复用依据。
 EOF
 )"
 
-  ensure_file_content "spec_center/${service}/contracts/openapi.yaml" "$(cat <<EOF
-openapi: 3.0.0
-x-generated-by: cursor-tune
-info:
-  title: ${service}
-  version: 0.0.1
-paths: {}
-EOF
-)"
+  for service in "${SERVICE_NAMES[@]+"${SERVICE_NAMES[@]}"}"; do
+    openapi_tmp="$(mktemp)"
+    spec_tmp="$(mktemp)"
+    {
+      echo "openapi: 3.0.0"
+      echo "x-generated-by: cursor-tune"
+      echo "x-inventory:"
+      echo "  modules_detected: ${#MODULE_DIRS[@]}"
+      echo "  api_candidates_detected: ${#API_FILES[@]}"
+      echo "  source_file: _cursor_init/project-inventory.md"
+      echo "info:"
+      echo "  title: ${service}"
+      echo "  version: 0.0.1"
+      echo "paths:"
+      link_count=0
+      while IFS= read -r link_line; do
+        [[ -z "${link_line}" ]] && continue
+        link_id="${link_line%%|*}"
+        link_cap="${link_line#*|}"
+        link_cap="${link_cap%%|*}"
+        link_ep="${link_line#*|*|}"
+        link_ep="${link_ep%%|*}"
+        link_src="${link_line##*|}"
+        link_count=$((link_count + 1))
+        if [[ "${link_count}" -le 20 ]]; then
+          echo "  ${link_ep}:"
+          echo "    get:"
+          echo "      operationId: ${link_id}"
+          echo "      summary: ${link_cap}"
+          echo "      tags:"
+          echo "        - ${service}"
+          echo "      x-source-file: ${link_src}"
+          echo "      responses:"
+          echo "        '200':"
+          echo "          description: TODO: define response schema."
+        fi
+      done < "${link_tmp}"
+      if [[ "${link_count}" -eq 0 ]]; then
+        echo "  /api/root:"
+        echo "    get:"
+        echo "      operationId: cap.root.001"
+        echo "      summary: root 模块能力占位"
+        echo "      tags:"
+        echo "        - ${service}"
+        echo "      responses:"
+        echo "        '200':"
+        echo "          description: TODO: define response schema."
+      fi
+      echo
+      echo "tags:"
+      if [[ ${#MODULE_DIRS[@]} -eq 0 ]]; then
+        echo "  - name: root"
+        echo "    description: TODO: map root module endpoints."
+      else
+        for module in "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}"; do
+          rel_module="${module}"
+          [[ "${rel_module}" == "root" ]] && rel_module="root"
+          echo "  - name: ${rel_module}"
+          echo "    description: TODO: map ${rel_module} endpoints."
+        done
+      fi
+      echo
+      echo "x-api-candidate-files:"
+      if [[ ${#API_FILES[@]} -eq 0 ]]; then
+        echo "  - none"
+      else
+        api_rows=0
+        for api in "${API_FILES[@]+"${API_FILES[@]}"}"; do
+          api_rows=$((api_rows + 1))
+          if [[ "${api_rows}" -le 40 ]]; then
+            echo "  - ${api}"
+          fi
+        done
+        if [[ "${api_rows}" -gt 40 ]]; then
+          echo "  - ... (truncated)"
+        fi
+      fi
+      echo
+      echo "x-capability-links:"
+      link_count=0
+      while IFS= read -r link_line; do
+        [[ -z "${link_line}" ]] && continue
+        link_id="${link_line%%|*}"
+        link_cap="${link_line#*|}"
+        link_cap="${link_cap%%|*}"
+        link_ep="${link_line#*|*|}"
+        link_ep="${link_ep%%|*}"
+        link_src="${link_line##*|}"
+        link_count=$((link_count + 1))
+        if [[ "${link_count}" -le 40 ]]; then
+          echo "  - capability_id: ${link_id}"
+          echo "    capability: ${link_cap}"
+          echo "    endpoint: ${link_ep}"
+          echo "    source_file: ${link_src}"
+          echo "    registry_ref: spec_center/capability-registry.md"
+          echo "    spec_ref: spec_center/${service}/spec.md"
+        fi
+      done < "${link_tmp}"
+      if [[ "${link_count}" -eq 0 ]]; then
+        echo "  - capability_id: cap.root.001"
+        echo "    capability: root 模块能力占位"
+        echo "    endpoint: /api/root"
+        echo "    source_file: src/main/java/**/(controller|api|resource)/**"
+        echo "    registry_ref: spec_center/capability-registry.md"
+        echo "    spec_ref: spec_center/${service}/spec.md"
+      fi
+    } > "${openapi_tmp}"
+    openapi_file="spec_center/${service}/contracts/openapi.yaml"
+    ensure_file_content "${openapi_file}" "$(cat "${openapi_tmp}")"
+    rm -f "${openapi_tmp}"
+
+    {
+      echo "# ${service}｜服务能力规格（自动草案）"
+      echo
+      echo "> managed-by: cursor-tune"
+      echo "> source: _cursor_init/project-inventory.md"
+      echo
+      echo "## 1) Why（为什么做）"
+      echo "- 统一该服务对外能力定义，提升复用检索命中率。"
+      echo "- 让 capability-registry、openapi、实现代码三者保持可追溯。"
+      echo
+      echo "## 2) What（做什么）"
+      echo "- in scope：基于 controller/resource/api 扫描得到的能力候选。"
+      echo "- out of scope：未在 inventory 中出现的历史隐式接口。"
+      echo
+      echo "## 3) Capability 联动映射（关键）"
+      echo "| CapabilityID | Capability | Endpoint | Registry | OpenAPI | Source |"
+      echo "|---|---|---|---|---|---|"
+      link_count=0
+      while IFS= read -r link_line; do
+        [[ -z "${link_line}" ]] && continue
+        link_id="${link_line%%|*}"
+        link_cap="${link_line#*|}"
+        link_cap="${link_cap%%|*}"
+        link_ep="${link_line#*|*|}"
+        link_ep="${link_ep%%|*}"
+        link_src="${link_line##*|}"
+        link_count=$((link_count + 1))
+        if [[ "${link_count}" -le 40 ]]; then
+          printf "| %s | %s | %s | capability-registry.md | %s/contracts/openapi.yaml | %s |\n" \
+            "${link_id}" "${link_cap}" "${link_ep}" "${service}" "${link_src}"
+        fi
+      done < "${link_tmp}"
+      if [[ "${link_count}" -eq 0 ]]; then
+        echo "| cap.root.001 | root 模块能力占位 | /api/root | capability-registry.md | ${service}/contracts/openapi.yaml | src/main/java/**/(controller|api|resource)/** |"
+      fi
+      echo
+      echo "## 4) API / Contract 影响"
+      echo "- 契约文件：\`${service}/contracts/openapi.yaml\`"
+      echo "- 能力索引：\`capability-registry.md\`"
+      echo "- 盘点来源：\`_cursor_init/project-inventory.md\`"
+      echo
+      echo "## 5) DoD（完成定义）"
+      echo "- [ ] capability-registry 的 Capability 与 Endpoint 已对齐 openapi"
+      echo "- [ ] openapi 的 x-capability-links 可回溯到 registry 与 spec"
+      echo "- [ ] 关键能力补齐了 Notes/Synonyms（支持语义搜索）"
+    } > "${spec_tmp}"
+    spec_file="spec_center/${service}/spec.md"
+    ensure_file_content "${spec_file}" "$(cat "${spec_tmp}")"
+    rm -f "${spec_tmp}"
+  done
+  rm -f "${link_tmp}"
 }
 
 tune_config
@@ -381,6 +814,10 @@ fi
   echo "- multi_module: $( [[ "${MULTI_MODULE}" == "1" ]] && echo yes || echo no )"
   echo "- doc_sql: $( [[ "${HAS_DOC_SQL}" == "1" ]] && echo yes || echo no )"
   echo "- settings_file: ${SETTINGS_FILE:-none}"
+  echo "- modules_detected: ${#MODULE_DIRS[@]}"
+  echo "- api_candidates_detected: ${#API_FILES[@]}"
+  echo "- sql_files_detected: ${#SQL_FILES[@]}"
+  echo "- service_slug: ${SERVICE_SLUG}"
   echo
   echo "## Applied (upsert)"
   if [[ ${#ACTION_LOG[@]} -eq 0 ]]; then
@@ -403,8 +840,10 @@ fi
   echo "## Outputs"
   echo "- ${REPORT_FILE}"
   echo "- ${DIFF_FILE}"
+  echo "- ${INVENTORY_FILE}"
 } > "${REPORT_FILE}"
 
 echo "[cursor-tune] done"
 echo "- report: ${REPORT_FILE}"
 echo "- diff: ${DIFF_FILE}"
+echo "- inventory: ${INVENTORY_FILE}"

@@ -328,11 +328,15 @@ bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
 
 - `_cursor_init/tune-report.md`
 - `_cursor_init/tune.diff`
+- `_cursor_init/project-inventory.md`（项目扫描清单：模块/API/SQL/settings/openapi）
+- `spec_center/<service>/spec.md`（能力-契约联动草案，便于语义检索与人工收敛）
 
 说明：
 
 - `aggressive`：默认 upsert（存在则改，不存在则增）
 - `safe`：仅改带 `managed-by: cursor-tune` 的内容；其余输出 `needs_manual_confirm`
+- `spec_center` 丰满：基于 `project-inventory` 生成能力种子、模块 tags、API 候选提示（仍需人工收敛与确认）
+- 联动约束：`capability-registry.md`、`<service>/spec.md`、`<service>/contracts/openapi.yaml` 会互相写入引用字段，提升 `/api-search` 命中与可追溯性
 
 ## 推荐落地顺序（团队视角）
 

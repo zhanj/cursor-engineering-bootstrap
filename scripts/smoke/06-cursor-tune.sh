@@ -36,11 +36,14 @@ run_case() {
   workdir="$(mktemp -d)"
   trap 'rm -rf "${workdir}"' RETURN
 
-  mkdir -p "${workdir}/module-a/src/main/java/com/acme/controller" "${workdir}/doc/sql" "${workdir}/.cursor/hooks/gates"
-  printf "<project/>" > "${workdir}/pom.xml"
-  printf "<project/>" > "${workdir}/module-a/pom.xml"
-  printf "<settings/>" > "${workdir}/settings-custom.xml"
-  cat > "${workdir}/.cursor/hooks/hooks.json" <<'EOF'
+  local project_dir="${workdir}/ehs-clnt-hazard-parent-runenv"
+  mkdir -p "${project_dir}/module-a/src/main/java/com/acme/controller" "${project_dir}/doc/sql" "${project_dir}/.cursor/hooks/gates"
+  printf "<project/>" > "${project_dir}/pom.xml"
+  printf "<project/>" > "${project_dir}/module-a/pom.xml"
+  printf "class UserController {}" > "${project_dir}/module-a/src/main/java/com/acme/controller/UserController.java"
+  printf "create table t(id bigint);" > "${project_dir}/doc/sql/V1__init.sql"
+  printf "<settings/>" > "${project_dir}/settings-custom.xml"
+  cat > "${project_dir}/.cursor/hooks/hooks.json" <<'EOF'
 {
   "version": 1,
   "hooks": [
@@ -53,18 +56,35 @@ run_case() {
 }
 EOF
 
-  bash "${TUNE_BIN}" --target-dir "${workdir}" --dry-run >/dev/null
-  assert_file "${workdir}/_cursor_init/tune-report.md"
-  assert_file "${workdir}/_cursor_init/tune.diff"
-  assert_contains "${workdir}/_cursor_init/tune-report.md" "dry_run: yes"
-  assert_contains "${workdir}/_cursor_init/tune.diff" "x-generated-by: cursor-tune"
-  assert_contains "${workdir}/.cursor/hooks/hooks.json" "\"run\": \"mvn -q test\""
+  bash "${TUNE_BIN}" --target-dir "${project_dir}" --dry-run >/dev/null
+  assert_file "${project_dir}/_cursor_init/tune-report.md"
+  assert_file "${project_dir}/_cursor_init/tune.diff"
+  assert_file "${project_dir}/_cursor_init/project-inventory.md"
+  assert_contains "${project_dir}/_cursor_init/tune-report.md" "dry_run: yes"
+  assert_contains "${project_dir}/_cursor_init/tune-report.md" "modules_detected:"
+  assert_contains "${project_dir}/_cursor_init/project-inventory.md" "API Candidate Files"
+  assert_contains "${project_dir}/_cursor_init/tune.diff" "x-generated-by: cursor-tune"
+  assert_contains "${project_dir}/.cursor/hooks/hooks.json" "\"run\": \"mvn -q test\""
 
-  bash "${TUNE_BIN}" --target-dir "${workdir}" --mode aggressive >/dev/null
-  assert_contains "${workdir}/.cursor/hooks/hooks.json" "-s settings-custom.xml"
-  assert_contains "${workdir}/.cursor/hooks/gates/config.sh" "doc/sql/"
-  assert_file "${workdir}/_cursor_init/tune-report.md"
-  assert_file "${workdir}/_cursor_init/tune.diff"
+  bash "${TUNE_BIN}" --target-dir "${project_dir}" --mode aggressive >/dev/null
+  assert_contains "${project_dir}/.cursor/hooks/hooks.json" "-s settings-custom.xml"
+  assert_contains "${project_dir}/.cursor/hooks/gates/config.sh" "doc/sql/"
+  assert_contains "${project_dir}/spec_center/capability-registry.md" "OwnerType 定义（必须）"
+  assert_contains "${project_dir}/spec_center/capability-registry.md" "internal-self"
+  assert_contains "${project_dir}/spec_center/capability-registry.md" "/api-search 推荐检索顺序（必须）"
+  assert_contains "${project_dir}/spec_center/capability-registry.md" "source="
+  assert_contains "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/contracts/openapi.yaml" "x-inventory:"
+  assert_contains "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/contracts/openapi.yaml" "x-capability-links:"
+  assert_contains "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/contracts/openapi.yaml" "operationId:"
+  assert_file "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/spec.md"
+  assert_contains "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/spec.md" "Capability 联动映射（关键）"
+  assert_contains "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv/spec.md" "openapi.yaml"
+  if [[ -d "${project_dir}/spec_center/ehs-clnt-hazard-parent-runenv-" ]]; then
+    echo "[smoke:tune] unexpected trailing-hyphen service directory"
+    exit 1
+  fi
+  assert_file "${project_dir}/_cursor_init/tune-report.md"
+  assert_file "${project_dir}/_cursor_init/tune.diff"
 }
 
 run_case

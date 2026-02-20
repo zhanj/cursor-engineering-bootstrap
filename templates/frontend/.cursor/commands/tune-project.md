@@ -13,12 +13,17 @@
 2. 读取并总结预览产物：
    - `_cursor_init/tune-report.md`
    - `_cursor_init/tune.diff`
+   - `_cursor_init/project-inventory.md`
 3. 若产物为空或与预期不符，先停止并输出原因，不进入 apply。
 4. 与用户确认是否执行 apply（建议默认 `safe`，明确同意后可改为 `aggressive`）。
 5. 执行 apply：
    - `bash bin/cursor-tune --use-current-dir --mode safe`
    - 或 `bash bin/cursor-tune --use-current-dir --mode aggressive`
-6. 再次读取并输出最终产物（report + diff），给出“已修改/建议人工确认”清单。
+6. 再次读取并输出最终产物（report + diff + inventory），给出“已修改/建议人工确认”清单。
+7. 核对 `spec_center` 三件套联动一致性：
+   - `capability-registry.md`
+   - `<service>/spec.md`
+   - `<service>/contracts/openapi.yaml`
 
 ## 输出格式（必须）
 - `调优模式`：`safe|aggressive`
@@ -28,6 +33,8 @@
 - `产物路径`：
   - `_cursor_init/tune-report.md`
   - `_cursor_init/tune.diff`
+  - `_cursor_init/project-inventory.md`
+- `联动校验`：说明三件套是否已互相引用（registry/spec/openapi）
 
 ## 禁止事项
 - 不跳过 dry-run 直接 apply。
