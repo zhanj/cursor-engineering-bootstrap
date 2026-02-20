@@ -73,6 +73,9 @@ EOF
   assert_contains "${project_dir}/spec_center/capability-registry.md" "internal-self"
   assert_contains "${project_dir}/spec_center/capability-registry.md" "/api-search 推荐检索顺序（必须）"
   assert_contains "${project_dir}/spec_center/capability-registry.md" "source="
+  assert_file "${project_dir}/bin/cursor-tune"
+  assert_file "${project_dir}/bin/cursor-bootstrap"
+  assert_file "${project_dir}/bin/cursor-cleanup"
   assert_file "${project_dir}/.cursor/rules/98-repo-scan-index.mdc"
   assert_contains "${project_dir}/.cursor/rules/00-core.mdc" "scan-derived-priority"
   assert_contains "${project_dir}/.cursor/commands/api-search.md" "scan-derived-search"
@@ -92,6 +95,36 @@ EOF
   assert_file "${project_dir}/_cursor_init/tune.diff"
 }
 
+run_frontend_case() {
+  local workdir
+  workdir="$(mktemp -d)"
+  trap 'rm -rf "${workdir}"' RETURN
+
+  local project_dir="${workdir}/ehs-fe-portal"
+  mkdir -p "${project_dir}/src/api" "${project_dir}/src/pages/hazard" "${project_dir}/src/routes" "${project_dir}/.cursor/hooks/gates"
+  cat > "${project_dir}/package.json" <<'EOF'
+{
+  "name": "ehs-fe-portal",
+  "scripts": {
+    "lint": "echo lint"
+  }
+}
+EOF
+  printf "export async function listHazards(){}" > "${project_dir}/src/api/hazard.ts"
+  printf "export default function HazardPage(){}" > "${project_dir}/src/pages/hazard/index.tsx"
+  printf "export const routes = []" > "${project_dir}/src/routes/router.ts"
+
+  bash "${TUNE_BIN}" --target-dir "${project_dir}" --mode aggressive >/dev/null
+  assert_contains "${project_dir}/_cursor_init/tune-report.md" "scan_stack: frontend"
+  assert_contains "${project_dir}/spec_center/capability-registry.md" "/page/"
+  assert_contains "${project_dir}/spec_center/ehs-fe-portal/contracts/openapi.yaml" "x-capability-links:"
+  assert_contains "${project_dir}/.cursor/hooks/hooks.json" "frontend:lint"
+  assert_contains "${project_dir}/.cursor/rules/98-repo-scan-index.mdc" "frontend_api_candidates_detected:"
+  assert_file "${project_dir}/bin/cursor-tune"
+  assert_file "${project_dir}/spec_center/ehs-fe-portal/spec.md"
+}
+
 run_case
+run_frontend_case
 
 echo "[smoke:tune] PASS"

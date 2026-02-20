@@ -6,6 +6,7 @@
 - 目标工程根目录（当前工作区根目录）
 - 已存在的 `_cursor_init` 产物（若无，先执行 `cursor-init/cursor-bootstrap`）
 - 团队偏好（`safe` / `aggressive`）
+- 目标仓 `bin/` wrapper（`cursor-tune|cursor-bootstrap|cursor-cleanup`，由 tune 自动补齐）
 
 ## 执行步骤（必须按顺序）
 1. 先执行 dry-run 预览：

@@ -93,8 +93,13 @@ declare -a OPENAPI_FILES=()
 declare -a SPEC_FILES=()
 declare -a SERVICE_NAMES=()
 declare -a BAD_SERVICE_DIR_HINTS=()
+declare -a FRONTEND_API_FILES=()
+declare -a FRONTEND_ROUTE_FILES=()
 
 SERVICE_SLUG="service"
+SCAN_STACK="unknown"
+BACKEND_API_COUNT=0
+FRONTEND_API_COUNT=0
 
 add_unique_file() {
   local rel="$1"
@@ -140,7 +145,7 @@ MULTI_MODULE=0
 HAS_DOC_SQL=0
 
 scan_project() {
-  local sf pom rel rel_dir api sql openapi rel_openapi spec rel_spec service_raw service_name raw_service
+  local sf pom rel rel_dir api sql openapi rel_openapi spec rel_spec service_raw service_name raw_service routef
 
   shopt -s nullglob
   for sf in "${PROJECT_DIR}"/settings-*.xml; do
@@ -170,7 +175,31 @@ scan_project() {
   while IFS= read -r api; do
     rel="${api#${PROJECT_DIR}/}"
     API_FILES+=("${rel}")
+    BACKEND_API_COUNT=$((BACKEND_API_COUNT + 1))
   done < <(find "${PROJECT_DIR}" -type f \( -name "*Controller.java" -o -name "*Resource.java" -o -name "*Api.java" -o -name "*Endpoint.java" \) -not -path "*/target/*" 2>/dev/null)
+
+  while IFS= read -r api; do
+    rel="${api#${PROJECT_DIR}/}"
+    if ! contains_in_array "${rel}" "${API_FILES[@]+"${API_FILES[@]}"}"; then
+      API_FILES+=("${rel}")
+      FRONTEND_API_FILES+=("${rel}")
+      FRONTEND_API_COUNT=$((FRONTEND_API_COUNT + 1))
+    fi
+  done < <(find "${PROJECT_DIR}" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.vue" \) \
+    \( -path "*/src/api/*" -o -path "*/src/services/*" -o -path "*/src/service/*" -o -path "*/src/store/*" \) \
+    -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*" 2>/dev/null)
+
+  while IFS= read -r routef; do
+    rel="${routef#${PROJECT_DIR}/}"
+    if ! contains_in_array "${rel}" "${FRONTEND_ROUTE_FILES[@]+"${FRONTEND_ROUTE_FILES[@]}"}"; then
+      FRONTEND_ROUTE_FILES+=("${rel}")
+    fi
+    if ! contains_in_array "${rel}" "${API_FILES[@]+"${API_FILES[@]}"}"; then
+      API_FILES+=("${rel}")
+      FRONTEND_API_COUNT=$((FRONTEND_API_COUNT + 1))
+    fi
+  done < <(find "${PROJECT_DIR}" -type f \( -name "*route*.ts" -o -name "*route*.tsx" -o -name "router.ts" -o -name "router.js" \) \
+    -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*" 2>/dev/null)
 
   while IFS= read -r sql; do
     rel="${sql#${PROJECT_DIR}/}"
@@ -221,6 +250,18 @@ scan_project() {
     SERVICE_NAMES+=("${SERVICE_SLUG}")
   fi
 
+  if [[ "${BACKEND_API_COUNT}" -gt 0 && "${FRONTEND_API_COUNT}" -gt 0 ]]; then
+    SCAN_STACK="hybrid"
+  elif [[ "${BACKEND_API_COUNT}" -gt 0 ]]; then
+    SCAN_STACK="backend"
+  elif [[ "${FRONTEND_API_COUNT}" -gt 0 ]]; then
+    SCAN_STACK="frontend"
+  elif [[ ${#MODULE_DIRS[@]} -gt 0 ]]; then
+    SCAN_STACK="backend"
+  else
+    SCAN_STACK="unknown"
+  fi
+
   if [[ ${#BAD_SERVICE_DIR_HINTS[@]} -gt 0 ]]; then
     local hint
     for hint in "${BAD_SERVICE_DIR_HINTS[@]+"${BAD_SERVICE_DIR_HINTS[@]}"}"; do
@@ -242,6 +283,9 @@ write_inventory() {
     echo "- settings_files_detected: ${#SETTINGS_FILES[@]}"
     echo "- openapi_files_detected: ${#OPENAPI_FILES[@]}"
     echo "- spec_files_detected: ${#SPEC_FILES[@]}"
+    echo "- scan_stack: ${SCAN_STACK}"
+    echo "- backend_api_candidates_detected: ${BACKEND_API_COUNT}"
+    echo "- frontend_api_candidates_detected: ${FRONTEND_API_COUNT}"
     echo "- suggested_service_slug: ${SERVICE_SLUG}"
     echo
 
@@ -295,6 +339,23 @@ write_inventory() {
       fi
     fi
     echo
+
+    echo "## Frontend Route Files"
+    if [[ ${#FRONTEND_ROUTE_FILES[@]} -eq 0 ]]; then
+      echo "- none"
+    else
+      idx=0
+      for item in "${FRONTEND_ROUTE_FILES[@]+"${FRONTEND_ROUTE_FILES[@]}"}"; do
+        idx=$((idx + 1))
+        if [[ "${idx}" -le 40 ]]; then
+          echo "- ${item}"
+        fi
+      done
+      if [[ "${idx}" -gt 40 ]]; then
+        echo "- ... (truncated)"
+      fi
+    fi
+    echo
   } > "${INVENTORY_FILE}"
 }
 
@@ -325,6 +386,9 @@ for rel in \
   ".cursor/commands/bridge-implement.md" \
   ".cursor/commands/init-scan.md" \
   ".cursor/commands/project-local-conventions.md" \
+  "bin/cursor-tune" \
+  "bin/cursor-bootstrap" \
+  "bin/cursor-cleanup" \
   "spec_center/capability-registry.md" \
   "spec_center/_raw_contracts/README.md"
 do
@@ -411,18 +475,26 @@ build_list_markdown() {
 }
 
 tune_cursor_rules_and_commands() {
-  local module_list api_list sql_list cmd_block
+  local module_list api_list sql_list cmd_block stack_code_hint endpoint_hint
   module_list="$(build_list_markdown 12 "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}")"
   api_list="$(build_list_markdown 15 "${API_FILES[@]+"${API_FILES[@]}"}")"
   sql_list="$(build_list_markdown 12 "${SQL_FILES[@]+"${SQL_FILES[@]}"}")"
+  stack_code_hint="控制器与实现代码"
+  endpoint_hint="\`spec_center/${SERVICE_SLUG}/contracts/openapi.yaml\`"
+  if [[ "${SCAN_STACK}" == "frontend" ]]; then
+    stack_code_hint="前端 API 调用与页面路由代码"
+  elif [[ "${SCAN_STACK}" == "hybrid" ]]; then
+    stack_code_hint="控制器实现 + 前端 API 调用/路由代码"
+  fi
 
   upsert_managed_block ".cursor/rules/00-core.mdc" "scan-derived-priority" "$(cat <<EOF
 ## 扫描校准（cursor-tune 自动维护）
 - 服务标识：\`${SERVICE_SLUG}\`
+- 工程类型：\`${SCAN_STACK}\`
 - 优先检索顺序（用于语义搜索）：
   1) \`spec_center/capability-registry.md\`
-  2) \`spec_center/${SERVICE_SLUG}/contracts/openapi.yaml\`
-  3) 控制器与实现代码
+  2) ${endpoint_hint}
+  3) ${stack_code_hint}
   4) \`spec_center/_raw_contracts/**\`（仅溯源）
 - 关键约束：新增/变更 API 后，必须同步更新 capability-registry + openapi + spec。
 EOF
@@ -432,8 +504,11 @@ EOF
 # managed-by: cursor-tune
 
 ## 扫描快照
+- scan_stack: ${SCAN_STACK}
 - modules_detected: ${#MODULE_DIRS[@]}
 - api_candidates_detected: ${#API_FILES[@]}
+- backend_api_candidates_detected: ${BACKEND_API_COUNT}
+- frontend_api_candidates_detected: ${FRONTEND_API_COUNT}
 - sql_files_detected: ${#SQL_FILES[@]}
 - settings_file: ${SETTINGS_FILE:-none}
 
@@ -559,13 +634,13 @@ tune_config() {
     return 0
   fi
 
-  if [[ "${MULTI_MODULE}" == "1" ]]; then
+  if [[ "${SCAN_STACK}" != "frontend" && "${MULTI_MODULE}" == "1" ]]; then
     replace_or_append_export "${target}" "CURSOR_API_DIR_WHITELIST_RE" ".*/src/main/java/.*/(controller|api|web|rest|resource)/|.*/src/main/java/.*/(dto|vo|form|request|response)/"
     replace_or_append_export "${target}" "CURSOR_SRC_MAIN_JAVA" "."
     replace_or_append_export "${target}" "CURSOR_SRC_MAIN_RESOURCES" "."
     replace_or_append_export "${target}" "CURSOR_DB_GATE_FIND_MAXDEPTH" "14"
   fi
-  if [[ "${HAS_DOC_SQL}" == "1" ]]; then
+  if [[ "${SCAN_STACK}" != "frontend" && "${HAS_DOC_SQL}" == "1" ]]; then
     replace_or_append_export "${target}" "CURSOR_MIGRATION_DIR_EXTRA_RE" "(^|/)(migration|migrations)/|(^|/)doc/sql/"
   fi
   add_unique_file "${rel}"
@@ -578,7 +653,21 @@ tune_hooks_json() {
 
   if [[ ! -f "${target}" ]]; then
     mkdir -p "$(dirname "${target}")"
-    cat > "${target}" <<'EOF'
+    if [[ "${SCAN_STACK}" == "frontend" ]]; then
+      cat > "${target}" <<'EOF'
+{
+  "version": 1,
+  "hooks": [
+    {
+      "name": "frontend:lint",
+      "when": "pre_commit",
+      "run": "npm run lint"
+    }
+  ]
+}
+EOF
+    else
+      cat > "${target}" <<'EOF'
 {
   "version": 1,
   "hooks": [
@@ -590,8 +679,14 @@ tune_hooks_json() {
   ]
 }
 EOF
+    fi
     add_unique_file "${rel}"
     append_action "created: ${rel}"
+  fi
+
+  if [[ "${SCAN_STACK}" == "frontend" ]]; then
+    append_suggest "hint: frontend stack detected, keep hooks aligned with package scripts (lint/test/build)"
+    return 0
   fi
 
   if [[ -z "${SETTINGS_FILE}" ]]; then
@@ -623,6 +718,40 @@ json.dump(obj,open(p,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
 PY
   add_unique_file "${rel}"
   append_action "patched: ${rel} (added -s ${SETTINGS_FILE})"
+}
+
+tune_bin_wrappers() {
+  local wrapper_name target_script
+  for wrapper_name in cursor-tune cursor-bootstrap cursor-cleanup; do
+    target_script="${ROOT_DIR}/bin/${wrapper_name}"
+    ensure_file_content "bin/${wrapper_name}" "$(cat <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+BOOTSTRAP_REPO="${ROOT_DIR}"
+TARGET_SCRIPT="\${BOOTSTRAP_REPO}/bin/${wrapper_name}"
+
+if [[ ! -f "\${TARGET_SCRIPT}" ]]; then
+  echo "[${wrapper_name} wrapper] missing script: \${TARGET_SCRIPT}"
+  exit 1
+fi
+
+has_target_flag=0
+for arg in "\$@"; do
+  if [[ "\${arg}" == "--target-dir" || "\${arg}" == "--use-current-dir" ]]; then
+    has_target_flag=1
+    break
+  fi
+done
+
+if [[ "\${has_target_flag}" == "1" ]]; then
+  exec bash "\${TARGET_SCRIPT}" "\$@"
+else
+  exec bash "\${TARGET_SCRIPT}" --target-dir "\$(pwd)" "\$@"
+fi
+EOF
+)"
+  done
 }
 
 upsert_spec_center() {
@@ -665,15 +794,30 @@ upsert_spec_center() {
 
   api_rows=0
   for api in "${API_FILES[@]+"${API_FILES[@]}"}"; do
-    class_name="$(basename "${api}" .java)"
+    class_name="$(basename "${api}")"
+    class_name="${class_name%.java}"
+    class_name="${class_name%.kt}"
+    class_name="${class_name%.ts}"
+    class_name="${class_name%.tsx}"
+    class_name="${class_name%.js}"
+    class_name="${class_name%.jsx}"
+    class_name="${class_name%.vue}"
     class_root="${class_name%Controller}"
     class_root="${class_root%Resource}"
     class_root="${class_root%Endpoint}"
     class_root="${class_root%Api}"
+    class_root="${class_root%Service}"
+    class_root="${class_root%Route}"
+    if [[ -z "${class_root}" ]]; then
+      class_root="${class_name}"
+    fi
     cap_words="$(printf "%s" "${class_root}" | sed -E 's/([a-z0-9])([A-Z])/\1 \2/g')"
     cap_slug="$(normalize_slug "${class_root}")"
     [[ -z "${cap_slug}" ]] && cap_slug="capability"
     endpoint_hint="/api/${cap_slug}"
+    if [[ "${api}" == *"/src/pages/"* || "${api}" == *"/src/routes/"* || "${api}" == *"/router"* ]]; then
+      endpoint_hint="/page/${cap_slug}"
+    fi
     cap_id="cap.${cap_slug}.$(printf "%03d" $((api_rows + 1)))"
     owner_service="${SERVICE_SLUG}"
     if [[ "${api}" == *"/${SERVICE_SLUG}/"* ]]; then
@@ -693,15 +837,25 @@ upsert_spec_center() {
     for module in "${MODULE_DIRS[@]+"${MODULE_DIRS[@]}"}"; do
       module_token="$(normalize_slug "${module}")"
       [[ -z "${module_token}" ]] && module_token="root"
-      printf "| %s 模块能力占位 | internal-self | %s | todo | /api/%s | core | source=%s/src/main/java/**/(controller|api|resource)/**; spec=%s/spec.md | %s |\n" \
-        "${module_token}" "${SERVICE_SLUG}" "${module_token}" "${module}" "${SERVICE_SLUG}" "${module_token}" >> "${cap_tmp}"
+      if [[ "${SCAN_STACK}" == "frontend" ]]; then
+        printf "| %s 模块能力占位 | internal-self | %s | todo | /page/%s | core | source=%s/src/{api,services,pages,routes}/**; spec=%s/spec.md | %s |\n" \
+          "${module_token}" "${SERVICE_SLUG}" "${module_token}" "${module}" "${SERVICE_SLUG}" "${module_token}" >> "${cap_tmp}"
+      else
+        printf "| %s 模块能力占位 | internal-self | %s | todo | /api/%s | core | source=%s/src/main/java/**/(controller|api|resource)/**; spec=%s/spec.md | %s |\n" \
+          "${module_token}" "${SERVICE_SLUG}" "${module_token}" "${module}" "${SERVICE_SLUG}" "${module_token}" >> "${cap_tmp}"
+      fi
       cap_rows=$((cap_rows + 1))
     done
   fi
 
   if [[ "${cap_rows}" -eq 0 ]]; then
-    echo "| root 模块能力占位 | internal-self | ${SERVICE_SLUG} | todo | /api/root | core | source=src/main/java/**/(controller|api|resource)/**; spec=${SERVICE_SLUG}/spec.md | root |" >> "${cap_tmp}"
-    printf "cap.root.001|root 模块能力占位|/api/root|src/main/java/**/(controller|api|resource)/**\n" >> "${link_tmp}"
+    if [[ "${SCAN_STACK}" == "frontend" ]]; then
+      echo "| root 模块能力占位 | internal-self | ${SERVICE_SLUG} | todo | /page/root | core | source=src/{api,services,pages,routes}/**; spec=${SERVICE_SLUG}/spec.md | root |" >> "${cap_tmp}"
+      printf "cap.root.001|root 模块能力占位|/page/root|src/{api,services,pages,routes}/**\n" >> "${link_tmp}"
+    else
+      echo "| root 模块能力占位 | internal-self | ${SERVICE_SLUG} | todo | /api/root | core | source=src/main/java/**/(controller|api|resource)/**; spec=${SERVICE_SLUG}/spec.md | root |" >> "${cap_tmp}"
+      printf "cap.root.001|root 模块能力占位|/api/root|src/main/java/**/(controller|api|resource)/**\n" >> "${link_tmp}"
+    fi
   fi
 
   {
@@ -905,6 +1059,7 @@ EOF
 
 tune_config
 tune_hooks_json
+tune_bin_wrappers
 upsert_spec_center
 
 TMP_DIFF_DIR="$(mktemp -d)"
@@ -947,9 +1102,12 @@ fi
   echo "- target: ${PROJECT_DIR}"
   echo "- multi_module: $( [[ "${MULTI_MODULE}" == "1" ]] && echo yes || echo no )"
   echo "- doc_sql: $( [[ "${HAS_DOC_SQL}" == "1" ]] && echo yes || echo no )"
+  echo "- scan_stack: ${SCAN_STACK}"
   echo "- settings_file: ${SETTINGS_FILE:-none}"
   echo "- modules_detected: ${#MODULE_DIRS[@]}"
   echo "- api_candidates_detected: ${#API_FILES[@]}"
+  echo "- backend_api_candidates_detected: ${BACKEND_API_COUNT}"
+  echo "- frontend_api_candidates_detected: ${FRONTEND_API_COUNT}"
   echo "- sql_files_detected: ${#SQL_FILES[@]}"
   echo "- service_slug: ${SERVICE_SLUG}"
   echo
