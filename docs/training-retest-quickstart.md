@@ -80,7 +80,16 @@ bash bin/cursor-tune --mode aggressive
 clear
 ```
 
-### 6) 固定验收（避免“看起来成功但没落盘”）
+### 6) 二次校准（建议执行）
+
+完成 `cursor-tune` 后，建议在 Cursor Chat 中补一次按工程校准：
+
+1. 输入：`按工程再优化一遍脚手架`
+2. 执行：`/check-scaffold`
+
+这样可以把“终端已落盘结果”再按当前工程语义复核一遍，减少漏配与路径漂移。
+
+### 7) 固定验收（避免“看起来成功但没落盘”）
 
 ```bash
 git status --short
@@ -142,7 +151,16 @@ bash bin/cursor-tune --mode aggressive
 clear
 ```
 
-### 6) 固定验收（frontend）
+### 6) 二次校准（frontend，建议执行）
+
+完成 `cursor-tune` 后，建议在 Cursor Chat 中补一次按工程校准：
+
+1. 输入：`按工程再优化一遍脚手架`
+2. 执行：`/check-scaffold`
+
+这样可以把“终端已落盘结果”再按当前工程语义复核一遍，减少漏配与路径漂移。
+
+### 7) 固定验收（frontend）
 
 ```bash
 git status --short
