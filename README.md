@@ -22,6 +22,14 @@
 
 ---
 
+## 运行环境与兼容性
+
+- 推荐环境：`macOS`、`Linux`、`Windows + WSL2`
+- 依赖：`bash`、`rg`（ripgrep）；部分流程依赖 `rsync`（用于“补缺不覆盖”的安全合并）
+- Windows 原生 `CMD/PowerShell` 不作为主支持路径，建议统一在 `WSL2` 中执行 `bin/*` 脚本
+
+---
+
 ## 快速开始（10 分钟）
 
 ### 1) 初始化 Spec Center（建议独立仓库）
@@ -639,6 +647,15 @@ A: 安装 ripgrep 后重试。`cursor-init` 依赖 `rg` 保证扫描性能与一
 ### Q5: `.cursor/rules/*.mdc` 没生效怎么办？
 
 A: 先确认 Cursor 当前打开的是“目标仓库根目录”而非上级目录，并确保项目根目录的 `.cursor/` 已落库。若规则仍未生效，先用 `/init-scan` 输出“规则加载与目录映射检查”结果再排查。
+
+### Q6: Windows 用户怎么运行这套脚手架？
+
+A: 建议使用 `WSL2`（Ubuntu）运行。最小步骤：
+
+1. 在 Windows 安装 WSL2 与 Ubuntu（命令：`wsl --install`）。
+2. 在 WSL2 内安装依赖：`bash`、`ripgrep(rg)`、`rsync`、`git`。
+3. 在 WSL2 终端进入仓库目录，使用 `bash bin/cursor-init ...` / `bash bin/cursor-bootstrap ...` 执行。
+4. 不建议在原生 `CMD/PowerShell` 直接跑 `bin/*`，避免 shell 与工具链兼容差异。
 
 ---
 
