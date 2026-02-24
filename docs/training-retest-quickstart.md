@@ -10,7 +10,7 @@
 
 - 脚手架仓库路径：`/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap`
 - 后端目标仓路径（示例）：`/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/ehs-clnt-hazard-parent-runenv`
-- 前端目标仓路径（示例）：`/path/to/your-frontend-repo`
+- 前端目标仓路径（示例）：`/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web`
 - 建议先确认：
   - 目标仓当前分支干净（或明确哪些改动是可保留的）
   - 已安装 `bash`、`rg`、`rsync`
@@ -51,7 +51,7 @@ bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineer
 
 ```bash
 bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-bootstrap" \
-  --target-dir "/path/to/your-frontend-repo" \
+  --target-dir "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web" \
   --mode frontend \
   --apply-to-root-cursor \
   --apply-mode merge \
@@ -158,7 +158,7 @@ ls -la "bin/cursor-tune" "bin/cursor-bootstrap" "bin/cursor-cleanup"
 ### 1) 进入前端仓并创建测试分支
 
 ```bash
-cd "/path/to/your-frontend-repo"
+cd "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web"
 git checkout -b chore/retest-latest-bootstrap-20260220
 clear
 ```
@@ -167,12 +167,12 @@ clear
 
 ```bash
 bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-cleanup" \
-  --target-dir "/path/to/your-frontend-repo" \
+  --target-dir "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web" \
   --include-spec-center-placeholders \
   --include-cursor-scaffold
 
 bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-cleanup" \
-  --target-dir "/path/to/your-frontend-repo" \
+  --target-dir "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web" \
   --include-spec-center-placeholders \
   --include-cursor-scaffold \
   --apply
@@ -183,7 +183,7 @@ clear
 
 ```bash
 bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-bootstrap" \
-  --target-dir "/path/to/your-frontend-repo" \
+  --target-dir "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web" \
   --mode frontend \
   --apply-to-root-cursor \
   --apply-mode merge \
