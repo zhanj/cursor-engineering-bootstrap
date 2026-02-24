@@ -151,10 +151,11 @@ if [[ "${INCLUDE_SPEC_CENTER_PLACEHOLDERS}" == "1" ]]; then
     add_delete_path "${raw_readme}"
   fi
 
+  declare -a openapi_files=()
   shopt -s nullglob
   openapi_files=("${PROJECT_DIR}"/spec_center/*/contracts/openapi.yaml)
   shopt -u nullglob
-  for f in "${openapi_files[@]}"; do
+  for f in "${openapi_files[@]+"${openapi_files[@]}"}"; do
     if [[ -f "${f}" ]] && rg -q -F "x-generated-by: cursor-bootstrap --enrich-spec-center" "${f}"; then
       add_delete_path "${f}"
     fi
