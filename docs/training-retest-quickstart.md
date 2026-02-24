@@ -37,7 +37,7 @@ uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 
 ```bash
 bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-bootstrap" \
-  --target-dir "/path/to/your-backend-repo" \
+  --target-dir "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/ehs-clnt-hazard-parent-runenv" \
   --mode backend \
   --apply-to-root-cursor \
   --apply-mode merge \
