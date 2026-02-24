@@ -17,7 +17,62 @@
 
 ---
 
-## 二、终端命令版（完整重测流程）
+## 二、零基础安装（目标仓无 spec_center / spec-kit）
+
+适用前提：目标仓里还没有 `.specify/`、`specs/`、`spec_center/` 等资产。
+
+### 1) 先确认 spec-kit CLI（specify）可用
+
+```bash
+specify --version
+```
+
+若提示 command not found，可先安装：
+
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+```
+
+### 2) backend 目标仓一键安装
+
+```bash
+bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-bootstrap" \
+  --target-dir "/path/to/your-backend-repo" \
+  --mode backend \
+  --apply-to-root-cursor \
+  --apply-mode merge \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes \
+  --enrich-spec-center
+```
+
+### 3) frontend 目标仓一键安装
+
+```bash
+bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineering-bootstrap/bin/cursor-bootstrap" \
+  --target-dir "/path/to/your-frontend-repo" \
+  --mode frontend \
+  --apply-to-root-cursor \
+  --apply-mode merge \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes \
+  --enrich-spec-center
+```
+
+### 4) 安装后最小验收（backend/frontend 通用）
+
+```bash
+ls -la "/path/to/your-repo/.specify"
+ls -la "/path/to/your-repo/specs"
+ls -la "/path/to/your-repo/spec_center"
+rg -n "spec-kit|ERROR|missing|failed|direct init|temp bootstrap" "/path/to/your-repo/_cursor_init/specify-init.log"
+```
+
+---
+
+## 三、终端命令版（完整重测流程）
 
 ### A. 后端目标仓（backend）
 
@@ -171,7 +226,7 @@ ls -la "bin/cursor-tune" "bin/cursor-bootstrap" "bin/cursor-cleanup"
 
 ---
 
-## 三、Cursor 命令版（Chat 内执行）
+## 四、Cursor 命令版（Chat 内执行）
 
 在目标仓打开 Cursor 后，按顺序输入：
 
@@ -186,7 +241,7 @@ ls -la "bin/cursor-tune" "bin/cursor-bootstrap" "bin/cursor-cleanup"
 
 ---
 
-## 四、培训讲解建议（5 分钟版）
+## 五、培训讲解建议（5 分钟版）
 
 - 先讲“为什么”：目标是让规则/命令/hooks/spec_center 与真实工程对齐，并且可审计。
 - 再讲“怎么做”：先清理、再 bootstrap、再 tune、最后固定验收。
@@ -197,7 +252,7 @@ ls -la "bin/cursor-tune" "bin/cursor-bootstrap" "bin/cursor-cleanup"
 
 ---
 
-## 五、常见问题（培训现场可直接回答）
+## 六、常见问题（培训现场可直接回答）
 
 - `Q: 为什么先 dry-run？`
   - `A:` 先看变更面，再做 apply，避免误改。

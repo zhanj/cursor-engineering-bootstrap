@@ -273,6 +273,47 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
 bash bin/cursor-bootstrap --target-dir /path/to/target-repo --no-bin-wrappers
 ```
 
+### 在“没有 spec-kit 资产”的目标仓生成 spec-kit 文件
+
+重要说明：
+
+- `cursor-bootstrap` 默认不会执行 `specify init`（需要显式开启参数）。
+- `bin/cursor-tune --mode aggressive` 不负责生成 spec-kit 资产（主要负责 `.cursor/spec_center` 调优）。
+
+请使用以下命令（按仓库类型选择 mode）：
+
+```bash
+# backend
+bash bin/cursor-bootstrap \
+  --target-dir /path/to/backend-repo \
+  --mode backend \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes
+
+# frontend
+bash bin/cursor-bootstrap \
+  --target-dir /path/to/frontend-repo \
+  --mode frontend \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes
+```
+
+最小验证步骤：
+
+```bash
+# 1) 确认 specify 可用（未安装则先安装）
+specify --version
+
+# 2) 校验 spec-kit 资产是否生成
+ls -la /path/to/target-repo/.specify
+ls -la /path/to/target-repo/specs
+
+# 3) 失败优先查看日志
+rg -n "spec-kit|ERROR|missing|failed|direct init|temp bootstrap" /path/to/target-repo/_cursor_init/specify-init.log
+```
+
 ### 关键开关
 
 - `--mode backend|frontend`：选择模板与镜像校准目标（默认 `backend`）
