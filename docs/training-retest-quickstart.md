@@ -116,7 +116,9 @@ bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineer
   --mode backend \
   --apply-to-root-cursor \
   --apply-mode merge \
-  --init-scan-overwrite off \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes \
   --enrich-spec-center
 clear
 ```
@@ -187,7 +189,9 @@ bash "/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/cursor-engineer
   --mode frontend \
   --apply-to-root-cursor \
   --apply-mode merge \
-  --init-scan-overwrite off \
+  --with-spec-kit \
+  --execute-spec-kit \
+  --spec-kit-yes \
   --enrich-spec-center
 clear
 ```
