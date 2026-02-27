@@ -33,7 +33,7 @@
 1. 更新脚手架仓库到最新代码。  
 2. 进入目标仓，创建独立重测分支。  
 3. 可选执行 `cursor-cleanup`，先 dry-run 再 apply，清理旧生成物。  
-4. 执行 `cursor-bootstrap` 一键编排，参数使用 merge 模式（后端用 `--mode backend`，前端用 `--mode frontend`）。  
+4. 执行 `cursor-bootstrap` 一键编排，统一使用全量参数：`--apply-mode merge --with-spec-kit --execute-spec-kit --spec-kit-yes --enrich-spec-center`；后端用 `--mode backend`，前端用 `--mode frontend`。  
 5. 执行 `cursor-tune --dry-run` 先看预览。  
 6. 确认后执行 `cursor-tune --mode aggressive` 正式调优。  
 7. 执行固定验收命令，确认关键内容已写入。
@@ -75,3 +75,5 @@
 如果现场只记住一句话：  
 **先预览、再应用、最后验收。**  
 不要跳步骤，不要凭感觉判断成功。
+
+补充一句：日常同学先看 `README.quickstart.md`，培训和回归再用 `docs/training-retest-quickstart.md`。

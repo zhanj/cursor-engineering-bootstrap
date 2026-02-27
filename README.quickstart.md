@@ -10,6 +10,15 @@
 bash install/install.sh --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz"
 ```
 
+自定义安装目录（可选）：
+
+```bash
+bash install/install.sh \
+  --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz" \
+  --install-root "/custom/path/.cursor-bootstrap" \
+  --bin-dir "/custom/path/bin"
+```
+
 如果你是脚手架维护者，在仓库内安装：
 
 ```bash
