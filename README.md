@@ -1,4 +1,4 @@
-# cursor-engineering-bootstrap（v2.1.4）
+# cursor-engineering-bootstrap
 
 面向存量项目的 Cursor 工程化脚手架。目标是让团队在不大改现有代码结构的前提下，快速建立一致的 AI 开发流程。
 
@@ -30,7 +30,72 @@
 
 ---
 
+## 安装包（Installer，跨平台）
+
+目标：避免“每位研发手工 copy 仓库”导致的版本漂移，统一通过安装器交付命令入口。
+
+### 本地产物（安装后）
+
+- 安装根目录：`~/.cursor-bootstrap/<version>/`
+- 当前版本指针：`~/.cursor-bootstrap/current`
+- 命令 shim 目录（默认）：`~/.local/bin`
+  - `cursor-init`
+  - `cursor-bootstrap`
+  - `cursor-tune`
+  - `cursor-cleanup`
+  - `cursor-tools`
+
+### macOS / Linux 示例
+
+```bash
+# 在仓库内执行（可按需指定 --repo）
+bash install/install.sh --repo "$(pwd)"
+
+# 校验
+cursor-tools --version
+cursor-tools self-check
+cursor-bootstrap --version
+```
+
+### Windows 示例（WSL2-first）
+
+```powershell
+# 在 PowerShell 中执行（会转到 WSL 内调用 install.sh）
+powershell -ExecutionPolicy Bypass -File .\install\install.ps1 -RepoPath .
+```
+
+安装完成后，建议在 WSL Shell 中使用命令（稳定性更高）：
+
+```bash
+cursor-tools --version
+cursor-tools self-check
+```
+
+### 升级 / 回滚
+
+- 升级：重新执行安装并指定新版本标签  
+  `bash install/install.sh --repo "$(pwd)" --version vX.Y.Z --force`
+- 回滚：重新安装旧版本标签  
+  `bash install/install.sh --repo "$(pwd)" --version vX.Y.(Z-1) --force`
+
+### 卸载
+
+```bash
+bash install/uninstall.sh --remove-all
+```
+
+Windows（PowerShell）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install\uninstall.ps1 -RepoPath . -RemoveAll
+```
+
+---
+
 ## 快速开始（10 分钟）
+
+默认示例使用“安装后命令入口”（`cursor-init` / `cursor-bootstrap`）。  
+若你是源码仓直跑模式，可将命令改写为 `bash bin/cursor-init ...` / `bash bin/cursor-bootstrap ...`。
 
 ### 1) 初始化 Spec Center（建议独立仓库）
 
@@ -41,15 +106,15 @@
 在后端仓库根目录运行：
 
 ```bash
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init dry-run --mode backend --use-current-dir
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode backend --use-current-dir
+cursor-init dry-run --mode backend --use-current-dir
+cursor-init bundle --mode backend --use-current-dir
 ```
 
 如果你不在目标仓库根目录执行，请显式指定：
 
 ```bash
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init dry-run --mode backend --target-dir /path/to/target-repo
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode backend --target-dir /path/to/target-repo
+cursor-init dry-run --mode backend --target-dir /path/to/target-repo
+cursor-init bundle --mode backend --target-dir /path/to/target-repo
 ```
 
 将 `_cursor_init/patch_bundle/backend/` 通过 PR 方式落库。
@@ -57,7 +122,7 @@ bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode backend 
 也可以使用一键编排（backend）：
 
 ```bash
-bash path/to/cursor-engineering-bootstrap/bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
+cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
 ```
 
 说明：默认“补缺不覆盖”；详细参数见下方“`bin/cursor-bootstrap`”章节。
@@ -67,15 +132,15 @@ bash path/to/cursor-engineering-bootstrap/bin/cursor-bootstrap --target-dir /pat
 在前端仓库根目录运行：
 
 ```bash
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init dry-run --mode frontend --use-current-dir
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode frontend --use-current-dir
+cursor-init dry-run --mode frontend --use-current-dir
+cursor-init bundle --mode frontend --use-current-dir
 ```
 
 如果你不在目标仓库根目录执行，请显式指定：
 
 ```bash
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init dry-run --mode frontend --target-dir /path/to/target-repo
-bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode frontend --target-dir /path/to/target-repo
+cursor-init dry-run --mode frontend --target-dir /path/to/target-repo
+cursor-init bundle --mode frontend --target-dir /path/to/target-repo
 ```
 
 将 `_cursor_init/patch_bundle/frontend/` 通过 PR 方式落库。
@@ -139,21 +204,21 @@ bash path/to/cursor-engineering-bootstrap/bin/cursor-init bundle --mode frontend
 
 ---
 
-## 命令说明（bin/cursor-init）
+## 命令说明（cursor-init）
 
 ### 语法
 
 ```bash
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo
-bash bin/cursor-init bundle  --mode backend|frontend|spec_center --target-dir /path/to/target-repo
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --use-current-dir
-bash bin/cursor-init bundle  --mode backend|frontend|spec_center --use-current-dir
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-yes
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes --overwrite
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-dry-run
-bash bin/cursor-init bundle --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bootstrap-readme
-bash bin/cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bin-wrappers
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo
+cursor-init bundle  --mode backend|frontend|spec_center --target-dir /path/to/target-repo
+cursor-init dry-run --mode backend|frontend|spec_center --use-current-dir
+cursor-init bundle  --mode backend|frontend|spec_center --use-current-dir
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-yes
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes --overwrite
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --with-spec-kit --spec-kit-ai cursor-agent --execute-spec-kit --spec-kit-dry-run
+cursor-init bundle --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bootstrap-readme
+cursor-init dry-run --mode backend|frontend|spec_center --target-dir /path/to/target-repo --no-bin-wrappers
 ```
 
 spec-kit 集成参数：
@@ -243,34 +308,34 @@ spec-kit 集成参数：
 示例命令与结果：
 
 ```bash
-bash bin/cursor-init bundle --mode backend --use-current-dir
+cursor-init bundle --mode backend --use-current-dir
 # => 生成 _cursor_init/patch_bundle/backend/
 
-bash bin/cursor-init bundle --mode frontend --use-current-dir
+cursor-init bundle --mode frontend --use-current-dir
 # => 生成 _cursor_init/patch_bundle/frontend/
 
-bash bin/cursor-init bundle --mode spec_center --use-current-dir
+cursor-init bundle --mode spec_center --use-current-dir
 # => 生成 _cursor_init/patch_bundle/spec_center/
 ```
 
 ---
 
-## 一键编排（bin/cursor-bootstrap，backend/frontend）
+## 一键编排（cursor-bootstrap，backend/frontend）
 
 用于把初始化动作串起来执行：`dry-run -> bundle -> (可选)spec-kit init -> (可选)写入目标仓根目录 .cursor -> (可选)spec_center 最小丰满 -> init-scan 镜像报告`。
 
 ### 语法
 
 ```bash
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo
-bash bin/cursor-bootstrap --mode frontend --target-dir /path/to/frontend-repo
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode overwrite --overwrite
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --init-scan-overwrite on
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --enrich-spec-center
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --plan-only
-bash bin/cursor-bootstrap --target-dir /path/to/target-repo --no-bin-wrappers
+cursor-bootstrap --target-dir /path/to/target-repo
+cursor-bootstrap --mode frontend --target-dir /path/to/frontend-repo
+cursor-bootstrap --target-dir /path/to/target-repo --with-spec-kit --execute-spec-kit --spec-kit-yes
+cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode merge
+cursor-bootstrap --target-dir /path/to/target-repo --apply-to-root-cursor --apply-mode overwrite --overwrite
+cursor-bootstrap --target-dir /path/to/target-repo --init-scan-overwrite on
+cursor-bootstrap --target-dir /path/to/target-repo --enrich-spec-center
+cursor-bootstrap --target-dir /path/to/target-repo --plan-only
+cursor-bootstrap --target-dir /path/to/target-repo --no-bin-wrappers
 ```
 
 ### 在“没有 spec-kit 资产”的目标仓生成 spec-kit 文件
@@ -278,13 +343,13 @@ bash bin/cursor-bootstrap --target-dir /path/to/target-repo --no-bin-wrappers
 重要说明：
 
 - `cursor-bootstrap` 默认不会执行 `specify init`（需要显式开启参数）。
-- `bin/cursor-tune --mode aggressive` 不负责生成 spec-kit 资产（主要负责 `.cursor/spec_center` 调优）。
+- `cursor-tune --mode aggressive` 不负责生成 spec-kit 资产（主要负责 `.cursor/spec_center` 调优）。
 
 请使用以下命令（按仓库类型选择 mode）：
 
 ```bash
 # backend
-bash bin/cursor-bootstrap \
+cursor-bootstrap \
   --target-dir /path/to/backend-repo \
   --mode backend \
   --with-spec-kit \
@@ -292,7 +357,7 @@ bash bin/cursor-bootstrap \
   --spec-kit-yes
 
 # frontend
-bash bin/cursor-bootstrap \
+cursor-bootstrap \
   --target-dir /path/to/frontend-repo \
   --mode frontend \
   --with-spec-kit \
@@ -336,22 +401,22 @@ rg -n "spec-kit|ERROR|missing|failed|direct init|temp bootstrap" /path/to/target
 - `_cursor_init/bootstrap-report.md`：一键编排执行摘要
 - `_cursor_init/init-scan-mirror.md`：镜像版 init-scan 状态输出（rules/commands/hooks/spec/constitution）
 
-## 生成物清理（bin/cursor-cleanup）
+## 生成物清理（cursor-cleanup）
 
 用于清理脚本生成产物，默认 `dry-run` 仅预览，不会删除文件。
 
 ```bash
 # 仅预览（默认）
-bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders
+cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders
 
 # 执行删除
-bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders --apply
+cursor-cleanup --target-dir /path/to/target-repo --include-spec-center-placeholders --apply
 
 # 清理脚手架创建的 .cursor 文件（安全模式：仅删与模板完全一致的文件）
-bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold --apply
+cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold --apply
 
 # 强制清理脚手架 .cursor 文件（即使本地有改动也删除）
-bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold-force --apply
+cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaffold-force --apply
 ```
 
 - 默认清理：`_cursor_init/`
@@ -363,19 +428,19 @@ bash bin/cursor-cleanup --target-dir /path/to/target-repo --include-cursor-scaff
 - 可选清理：`--include-cursor-scaffold-force`
   - 强制模式：按模板路径清理 `.cursor` 文件，即使有本地改动也删除
 
-## 二次定制（bin/cursor-tune）
+## 二次定制（cursor-tune）
 
 用于在 `/init-scan` 后按目标工程结构执行“存在即修改，不存在即新增（upsert）”的二次调优，并输出可审计 diff。
 
 ```bash
 # 预览（不落盘）
-bash bin/cursor-tune --target-dir /path/to/target-repo --dry-run
+cursor-tune --target-dir /path/to/target-repo --dry-run
 
 # 强执行（默认 aggressive）
-bash bin/cursor-tune --target-dir /path/to/target-repo --mode aggressive
+cursor-tune --target-dir /path/to/target-repo --mode aggressive
 
 # 安全模式（只改带 marker 区块，其余给建议）
-bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
+cursor-tune --target-dir /path/to/target-repo --mode safe
 ```
 
 产物：
@@ -476,7 +541,7 @@ bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
 
 ### Smoke tests（已内置）
 
-仓库内置了 6 类 smoke tests + 1 个总入口：
+仓库内置了 7 类 smoke tests + 1 个总入口：
 
 - `scripts/smoke/01-cursor-init-outputs.sh`
   - 断言 `bin/cursor-init` 在 `backend/frontend/spec_center` 三种 mode 下都能产出预期文件
@@ -490,6 +555,8 @@ bash bin/cursor-tune --target-dir /path/to/target-repo --mode safe
   - 检查 `bin/cursor-cleanup` 的 dry-run 与 apply 删除行为
 - `scripts/smoke/06-cursor-tune.sh`
   - 检查 `bin/cursor-tune` 的 dry-run/aggressive 模式与 diff 产出
+- `scripts/smoke/07-installers.sh`
+  - 检查安装器（install/uninstall）在隔离环境中的安装、版本输出与自检能力
 - `scripts/smoke/run-all.sh`
   - 一键运行全部 smoke tests
 
@@ -532,6 +599,7 @@ make smoke-templates
 make smoke-bootstrap
 make smoke-cleanup
 make smoke-tune
+make smoke-installers
 ```
 
 CI 自动执行：
@@ -634,10 +702,10 @@ CI 自动执行：
 
 ---
 
-## 边界与非目标（v2.1.4）
+## 边界与非目标
 
 - 不会自动修改业务代码
-- 不会覆盖已有 `.cursor` 资产
+- 默认不会覆盖已有 `.cursor` 资产（除非显式使用覆盖模式）
 - 只生成建议文件与可审查补丁包
 - `hooks.suggested.json` 仅给建议，不自动写回
 - gates 已加强配置缺失保护与 macOS/Bash 兼容
@@ -695,7 +763,7 @@ A: 建议使用 `WSL2`（Ubuntu）运行。最小步骤：
 
 1. 在 Windows 安装 WSL2 与 Ubuntu（命令：`wsl --install`）。
 2. 在 WSL2 内安装依赖：`bash`、`ripgrep(rg)`、`rsync`、`git`。
-3. 在 WSL2 终端进入仓库目录，使用 `bash bin/cursor-init ...` / `bash bin/cursor-bootstrap ...` 执行。
+3. 在 WSL2 终端进入工作目录，使用 `cursor-init ...` / `cursor-bootstrap ...` 执行（源码模式可用 `bash bin/...`）。
 4. 不建议在原生 `CMD/PowerShell` 直接跑 `bin/*`，避免 shell 与工具链兼容差异。
 
 ---
