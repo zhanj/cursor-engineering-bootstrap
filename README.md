@@ -57,11 +57,23 @@ cursor-tools self-check
 cursor-bootstrap --version
 ```
 
+从安装包 URL 安装（无需本地完整仓库）：
+
+```bash
+bash install/install.sh --package-url "https://your-real-domain/cursor-bootstrap/bootstrap-package.tgz"
+```
+
 ### Windows 示例（WSL2-first）
 
 ```powershell
 # 在 PowerShell 中执行（会转到 WSL 内调用 install.sh）
 powershell -ExecutionPolicy Bypass -File .\install\install.ps1 -RepoPath .
+```
+
+从安装包 URL 安装（PowerShell）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install\install.ps1 -PackageUrl "https://your-real-domain/cursor-bootstrap/bootstrap-package.tgz"
 ```
 
 安装完成后，建议在 WSL Shell 中使用命令（稳定性更高）：
@@ -77,6 +89,10 @@ cursor-tools self-check
   `bash install/install.sh --repo "$(pwd)" --version vX.Y.Z --force`
 - 回滚：重新安装旧版本标签  
   `bash install/install.sh --repo "$(pwd)" --version vX.Y.(Z-1) --force`
+
+说明：安装器不会只靠 `install/` 目录完成安装。  
+`--repo` 模式依赖完整脚手架目录结构（`bin/templates/docs/scripts/scanner`）；  
+`--package-url` 模式依赖包含上述目录的完整压缩包。
 
 ### 卸载
 

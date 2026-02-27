@@ -8,6 +8,8 @@ Usage:
 
 Options:
   --repo <path>          Bootstrap repository path (default: parent of this script)
+  --package-url <url>    Package archive URL (.tar.gz) to install from
+  --package-sha256 <hex> Optional sha256 checksum for package verification
   --version <name>       Install version label (default: git tag/sha or timestamp)
   --install-root <path>  Install root (default: $HOME/.cursor-bootstrap)
   --bin-dir <path>       Command shim dir (default: $HOME/.local/bin)
@@ -17,15 +19,33 @@ EOF
 }
 
 REPO_PATH=""
+PACKAGE_URL=""
+PACKAGE_SHA256=""
 VERSION=""
 INSTALL_ROOT="${HOME}/.cursor-bootstrap"
 BIN_DIR="${HOME}/.local/bin"
 FORCE=0
+PACKAGE_WORKDIR=""
+
+cleanup() {
+  if [[ -n "${PACKAGE_WORKDIR}" && -d "${PACKAGE_WORKDIR}" ]]; then
+    rm -rf "${PACKAGE_WORKDIR}"
+  fi
+}
+trap cleanup EXIT
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
       REPO_PATH="${2:-}"
+      shift 2
+      ;;
+    --package-url)
+      PACKAGE_URL="${2:-}"
+      shift 2
+      ;;
+    --package-sha256)
+      PACKAGE_SHA256="${2:-}"
       shift 2
       ;;
     --version)
@@ -57,7 +77,73 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -z "${REPO_PATH}" ]]; then
+
+if [[ -n "${REPO_PATH}" && -n "${PACKAGE_URL}" ]]; then
+  echo "Use either --repo or --package-url, not both."
+  exit 1
+fi
+
+is_repo_root() {
+  local path="$1"
+  [[ -d "${path}/bin" && -d "${path}/templates" && -d "${path}/scripts" ]]
+}
+
+resolve_repo_from_package() {
+  local workdir archive unpack
+  workdir="$(mktemp -d)"
+  PACKAGE_WORKDIR="${workdir}"
+  archive="${workdir}/package.tgz"
+  unpack="${workdir}/unpack"
+  mkdir -p "${unpack}"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${PACKAGE_URL}" -o "${archive}"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "${archive}" "${PACKAGE_URL}"
+  else
+    echo "Either curl or wget is required to download package archives."
+    exit 1
+  fi
+
+  if [[ -n "${PACKAGE_SHA256}" ]]; then
+    local actual
+    if command -v shasum >/dev/null 2>&1; then
+      actual="$(shasum -a 256 "${archive}" | awk '{print $1}')"
+    elif command -v sha256sum >/dev/null 2>&1; then
+      actual="$(sha256sum "${archive}" | awk '{print $1}')"
+    else
+      echo "No sha256 tool found (shasum/sha256sum)."
+      exit 1
+    fi
+    if [[ "${actual}" != "${PACKAGE_SHA256}" ]]; then
+      echo "Package checksum mismatch."
+      echo "expected=${PACKAGE_SHA256}"
+      echo "actual=${actual}"
+      exit 1
+    fi
+  fi
+
+  tar -xzf "${archive}" -C "${unpack}"
+
+  if is_repo_root "${unpack}"; then
+    REPO_PATH="${unpack}"
+    return 0
+  fi
+
+  local first_dir
+  first_dir="$(find "${unpack}" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [[ -n "${first_dir}" ]] && is_repo_root "${first_dir}"; then
+    REPO_PATH="${first_dir}"
+    return 0
+  fi
+
+  echo "Package does not contain a valid bootstrap repository layout."
+  exit 1
+}
+
+if [[ -n "${PACKAGE_URL}" ]]; then
+  resolve_repo_from_package
+elif [[ -z "${REPO_PATH}" ]]; then
   REPO_PATH="$(cd "${SCRIPT_DIR}/.." && pwd)"
 fi
 REPO_PATH="$(cd "${REPO_PATH}" && pwd)"

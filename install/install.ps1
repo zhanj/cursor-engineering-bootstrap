@@ -1,5 +1,7 @@
 param(
   [string]$RepoPath = "",
+  [string]$PackageUrl = "",
+  [string]$PackageSha256 = "",
   [string]$Version = "",
   [string]$InstallRoot = "~/.cursor-bootstrap",
   [string]$BinDir = "~/.local/bin",
@@ -21,10 +23,23 @@ function Resolve-WslPath([string]$PathValue) {
 }
 
 try {
+  if (-not [string]::IsNullOrWhiteSpace($RepoPath) -and -not [string]::IsNullOrWhiteSpace($PackageUrl)) {
+    throw "Use either -RepoPath or -PackageUrl, not both."
+  }
+
   $repoWsl = Resolve-WslPath $RepoPath
   $scriptWsl = "$repoWsl/install/install.sh"
 
-  $argsList = @("--repo", $repoWsl, "--install-root", $InstallRoot, "--bin-dir", $BinDir)
+  $argsList = @("--install-root", $InstallRoot, "--bin-dir", $BinDir)
+  if (-not [string]::IsNullOrWhiteSpace($PackageUrl)) {
+    $argsList += @("--package-url", $PackageUrl)
+    if (-not [string]::IsNullOrWhiteSpace($PackageSha256)) {
+      $argsList += @("--package-sha256", $PackageSha256)
+    }
+  }
+  else {
+    $argsList += @("--repo", $repoWsl)
+  }
   if (-not [string]::IsNullOrWhiteSpace($Version)) {
     $argsList += @("--version", $Version)
   }

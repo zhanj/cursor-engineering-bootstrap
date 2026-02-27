@@ -40,6 +40,19 @@ HOME="${TEST_HOME}" bash "${ROOT_DIR}/install/uninstall.sh" --remove-all >/dev/n
   exit 1
 }
 
+# package-url mode
+PKG_DIR="$(mktemp -d)"
+PKG_FILE="${PKG_DIR}/bootstrap-package.tgz"
+tar -czf "${PKG_FILE}" -C "${ROOT_DIR}" \
+  bin templates docs scripts scanner install README.md PR_TEMPLATE.md Makefile .gitignore
+HOME="${TEST_HOME}" bash "${ROOT_DIR}/install/install.sh" \
+  --package-url "file://${PKG_FILE}" \
+  --version "smoke-package" \
+  --force >/dev/null
+HOME="${TEST_HOME}" "${TEST_HOME}/.local/bin/cursor-tools" self-check >/dev/null
+HOME="${TEST_HOME}" bash "${ROOT_DIR}/install/uninstall.sh" --remove-all >/dev/null
+rm -rf "${PKG_DIR}"
+
 # WSL-first windows wrappers should exist and include wsl call
 [[ -f "${ROOT_DIR}/install/install.ps1" ]] || exit 1
 [[ -f "${ROOT_DIR}/install/uninstall.ps1" ]] || exit 1
