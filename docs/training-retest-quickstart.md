@@ -11,6 +11,7 @@
 - 后端目标仓：`/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/ehs-clnt-hazard-parent-runenv`
 - 前端目标仓：`/Users/zhanjie/Library/CloudStorage/OneDrive-Personal/code/forest-fire-monitor-web`
 - 依赖：`bash`、`rg`、`rsync`、`git`、`specify`
+- 默认安装路径（`install.sh`）：安装根目录 `~/.cursor-bootstrap/<version>/`，当前版本链接 `~/.cursor-bootstrap/current`，命令入口 `~/.local/bin`
 
 安装 `specify`（缺失时）：
 

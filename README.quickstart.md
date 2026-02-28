@@ -10,6 +10,8 @@
 bash install/install.sh --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz"
 ```
 
+默认安装路径：安装根目录为 `~/.cursor-bootstrap/<version>/`，当前版本链接为 `~/.cursor-bootstrap/current`，命令入口在 `~/.local/bin`。
+
 自定义安装目录（可选）：
 
 ```bash
