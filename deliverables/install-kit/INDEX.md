@@ -27,6 +27,15 @@ macOS/Linux（发布包 URL）：
 bash install/install.sh --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz"
 ```
 
+自定义安装目录（可选）：
+
+```bash
+bash install/install.sh \
+  --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz" \
+  --install-root "/custom/path/.cursor-bootstrap" \
+  --bin-dir "/custom/path/bin"
+```
+
 Windows PowerShell（WSL2-first）：
 
 ```powershell
