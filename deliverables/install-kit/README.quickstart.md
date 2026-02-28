@@ -7,7 +7,7 @@
 从 Release 安装（推荐）：
 
 ```bash
-bash install/install.sh --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz"
+bash install/install.sh --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz"
 ```
 
 默认安装路径：安装根目录为 `~/.cursor-bootstrap/<version>/`，当前版本链接为 `~/.cursor-bootstrap/current`，命令入口在 `~/.local/bin`。
@@ -16,7 +16,7 @@ bash install/install.sh --package-url "https://github.com/zhanj/cursor-engineeri
 
 ```bash
 bash install/install.sh \
-  --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz" \
+  --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz" \
   --install-root "/custom/path/.cursor-bootstrap" \
   --bin-dir "/custom/path/bin"
 ```
@@ -88,7 +88,7 @@ bin/cursor-tune --mode aggressive
 
 ```bash
 # 一步：打包 + 发布 + 输出安装命令
-bash scripts/release/cut-release.sh --tag vX.Y.Z --repo zhanj/cursor-engineering-bootstrap
+bash scripts/release/cut-release.sh --tag vX.Y.Z --repo <owner>/<repo>
 ```
 
 仅本地演练（不发布）：

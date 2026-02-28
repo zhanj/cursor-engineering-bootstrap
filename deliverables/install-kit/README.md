@@ -36,7 +36,7 @@ cursor-tools self-check
 从发布包安装（适合研发同学）：
 
 ```bash
-bash install/install.sh --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz"
+bash install/install.sh --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz"
 ```
 
 默认安装路径：安装根目录为 `~/.cursor-bootstrap/<version>/`，当前版本链接为 `~/.cursor-bootstrap/current`，命令入口在 `~/.local/bin`。
@@ -45,7 +45,7 @@ bash install/install.sh --package-url "https://github.com/zhanj/cursor-engineeri
 
 ```bash
 bash install/install.sh \
-  --package-url "https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz" \
+  --package-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz" \
   --install-root "/custom/path/.cursor-bootstrap" \
   --bin-dir "/custom/path/bin"
 ```
@@ -127,13 +127,13 @@ bash install/uninstall.sh --remove-all
 bash scripts/release/package.sh --output-dir /tmp/cursor-bootstrap-pkg --version vX.Y.Z
 
 # 2) 发布
-bash scripts/release/publish.sh --tag vX.Y.Z --archive /tmp/cursor-bootstrap-pkg/bootstrap-package.tgz --repo zhanj/cursor-engineering-bootstrap
+bash scripts/release/publish.sh --tag vX.Y.Z --archive /tmp/cursor-bootstrap-pkg/bootstrap-package.tgz --repo <owner>/<repo>
 ```
 
 ### 一步法（推荐）
 
 ```bash
-bash scripts/release/cut-release.sh --tag vX.Y.Z --repo zhanj/cursor-engineering-bootstrap
+bash scripts/release/cut-release.sh --tag vX.Y.Z --repo <owner>/<repo>
 ```
 
 只做本地演练（不发布）：
@@ -144,7 +144,7 @@ bash scripts/release/cut-release.sh --tag vX.Y.Z --skip-publish
 
 发布后安装 URL 固定为：
 
-`https://github.com/zhanj/cursor-engineering-bootstrap/releases/download/vX.Y.Z/bootstrap-package.tgz`
+`https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/bootstrap-package.tgz`
 
 ---
 
